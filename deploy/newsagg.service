@@ -1,0 +1,25 @@
+[Unit]
+Description=News Aggregator (FastAPI + scheduler)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/newsagg
+EnvironmentFile=/opt/newsagg/.env
+ExecStart=/opt/newsagg/.venv/bin/uvicorn app.api.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/newsagg/data /opt/newsagg/logs
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
