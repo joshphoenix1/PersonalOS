@@ -375,7 +375,7 @@
           </svg>
         </div>
         <div class="map-corners">
-          <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">MIDDLE EAST</span></div>
+          <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">DUBAI</span></div>
           <div class="corner tr"><span class="k">HOTSPOTS</span><span class="v" id="c-spots">—</span></div>
           <div class="corner bl"><span class="k">SOURCES ACTIVE</span><span class="v" id="c-src">—</span></div>
           <div class="corner br"><span class="k">LAST SYNC</span><span class="v mono" id="c-sync">—</span></div>
@@ -384,7 +384,8 @@
           <button data-zoom="in"    title="Zoom in">+</button>
           <button data-zoom="out"   title="Zoom out">−</button>
           <button data-zoom="gulf"  title="Jump to Gulf">G</button>
-          <button data-zoom="reset" title="Reset to Middle East">⟲</button>
+          <button data-zoom="me"    title="Jump to Middle East">M</button>
+          <button data-zoom="reset" title="Reset to Dubai">⟲</button>
         </div>
       </div>
     </section>
@@ -487,6 +488,9 @@ const HOTSPOTS = [
   { key: "cairo",     name: "Cairo",     lat: 30.04, lon: 31.23, region: "global",   match: t => /egypt|cairo|suez/i.test(t) },
 ];
 
+// Projection fits ME so zooming out stays meaningful. The *initial* load
+// view is Dubai (tight aerial on UAE + neighbors); Gulf and ME are one click
+// away via the M / G buttons.
 const ME_BBOX = {
   type: "Feature",
   geometry: { type: "Polygon", coordinates: [[[25, 10], [65, 10], [65, 42], [25, 42], [25, 10]]] }
@@ -494,6 +498,11 @@ const ME_BBOX = {
 const GULF_BBOX = {
   type: "Feature",
   geometry: { type: "Polygon", coordinates: [[[48, 22], [58, 22], [58, 29], [48, 29], [48, 22]]] }
+};
+// Dubai-centred: Abu Dhabi / Sharjah / Musandam / Hormuz / Iran south coast.
+const DUBAI_BBOX = {
+  type: "Feature",
+  geometry: { type: "Polygon", coordinates: [[[53.5, 23.5], [57, 23.5], [57, 26.5], [53.5, 26.5], [53.5, 23.5]]] }
 };
 
 let STATE = null;
@@ -664,7 +673,7 @@ async function renderMap(articles) {
   }
 
   const zoom = d3.zoom()
-    .scaleExtent([0.6, 10])
+    .scaleExtent([0.6, 20])
     .on("zoom", (event) => {
       mapLayer.attr("transform", event.transform);
       positionSpots(event.transform);
@@ -673,15 +682,23 @@ async function renderMap(articles) {
   svg.call(zoom);
   svg.on("dblclick.zoom", null);
 
-  const initial = d3.zoomIdentity;
-  const gulfTransform = (() => {
-    const [[x0, y0], [x1, y1]] = path.bounds(GULF_BBOX);
+  // Helper: transform that fits a bbox into the viewport (with a small inset).
+  const fitBbox = (bbox) => {
+    const [[x0, y0], [x1, y1]] = path.bounds(bbox);
     const bx = Math.max(1, x1 - x0), by = Math.max(1, y1 - y0);
     const k = Math.min(w / bx, h / by) * 0.95;
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     return d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(k);
-  })();
+  };
+
+  const dubaiTransform = fitBbox(DUBAI_BBOX);
+  const gulfTransform  = fitBbox(GULF_BBOX);
+  const meTransform    = d3.zoomIdentity;   // projection already fits ME
+  const initial        = dubaiTransform;
+
   svg.call(zoom.transform, initial);
+  // Belt-and-suspenders: apply to layers directly in case the synthetic
+  // zoom event is deferred in some browser paths. Keeps the load deterministic.
   mapLayer.attr("transform", initial.toString());
   positionSpots(initial);
   document.getElementById("c-view").textContent = `${initial.k.toFixed(1)}× · ${describeView(initial, projection, w, h)}`;
@@ -689,14 +706,15 @@ async function renderMap(articles) {
   const active = HOTSPOTS.filter(h => counts[h.key] > 0).length;
   document.getElementById("c-spots").textContent = `${active}/${HOTSPOTS.length}`;
 
-  MAP = { zoom, svg, initial, gulfTransform, projection };
+  MAP = { zoom, svg, initial, dubaiTransform, gulfTransform, meTransform, projection };
 }
 
 function describeView(t, projection, w, h) {
   const center = projection.invert ? projection.invert([(w/2 - t.x) / t.k, (h/2 - t.y) / t.k]) : null;
-  if (!center) return "MIDDLE EAST";
+  if (!center) return "DUBAI";
   const [lon, lat] = center;
-  if (t.k > 4) return `${Math.abs(lat).toFixed(1)}°${lat>=0?"N":"S"} ${Math.abs(lon).toFixed(1)}°${lon>=0?"E":"W"}`;
+  if (t.k > 15) return `${Math.abs(lat).toFixed(2)}°${lat>=0?"N":"S"} ${Math.abs(lon).toFixed(2)}°${lon>=0?"E":"W"}`;
+  if (t.k > 6)   return "DUBAI";
   if (t.k > 1.6) return "GULF";
   return "MIDDLE EAST";
 }
@@ -706,9 +724,10 @@ function wireZoomControls() {
     btn.addEventListener("click", () => {
       if (!MAP) return;
       const action = btn.dataset.zoom;
-      const { zoom, svg, initial, gulfTransform } = MAP;
+      const { zoom, svg, initial, gulfTransform, meTransform } = MAP;
       if      (action === "reset") svg.transition().duration(500).call(zoom.transform, initial);
       else if (action === "gulf")  svg.transition().duration(500).call(zoom.transform, gulfTransform);
+      else if (action === "me")    svg.transition().duration(500).call(zoom.transform, meTransform);
       else if (action === "in")    svg.transition().duration(250).call(zoom.scaleBy, 1.5);
       else if (action === "out")   svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.5);
     });
