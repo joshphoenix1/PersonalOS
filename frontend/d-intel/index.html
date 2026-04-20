@@ -78,8 +78,8 @@
   .schedule .sch-label .v { font: 500 12.5px "JetBrains Mono", monospace; color: var(--text); margin-top: 2px; }
   .schedule .sch-label .v .hl { color: var(--amber); }
   .schedule .sch-items {
-    display: flex; align-items: center; gap: 22px; padding: 0 20px; overflow-x: auto;
-    font-size: clamp(11px, 0.78vw, 13px);
+    display: flex; align-items: center; gap: 22px; padding: 0 20px; overflow: hidden;
+    font-size: clamp(11px, 0.78vw, 13px); min-width: 0;
   }
   .schedule .sch-item { display: flex; gap: 10px; align-items: baseline; white-space: nowrap; }
   .schedule .sch-item .t { font: 600 11px "JetBrains Mono", monospace; color: var(--cyan); letter-spacing: .04em; }
@@ -134,9 +134,10 @@
     position: relative; z-index: 1; flex-shrink: 0;
   }
   .panel .phead .hcode { color: var(--muted); font-size: 10px; }
-  /* All panel bodies fill the remaining space; if they overflow they scroll themselves (not the page). */
+  /* All panel bodies fill the remaining space. Never scroll — items that
+     don't fit are trimmed by fitRender() in the script, not by the browser. */
   .panel .pbody {
-    flex: 1; min-height: 0; overflow-y: auto;
+    flex: 1; min-height: 0; overflow: hidden;
     padding: 8px 12px; position: relative; z-index: 1;
   }
 
@@ -282,11 +283,12 @@
   }
   .right-rail .pbody { padding: 8px 12px; }
 
-  .wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .wx-cell { border: 1px solid var(--border); background: rgba(14, 24, 40, 0.5); padding: 6px 9px; border-radius: 2px; }
-  .wx-cell .c { font: 600 10px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  .wx-cell .t { font-family: "JetBrains Mono", monospace; font-size: clamp(14px, 1.1vw, 19px); font-weight: 500; color: var(--text); margin-top: 2px; }
-  .wx-cell .sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  /* Weather: 2 cols × 4 rows (7 cells + one empty). Cells share the panel height. */
+  .wx-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 4px; height: 100%; }
+  .wx-cell { border: 1px solid var(--border); background: rgba(14, 24, 40, 0.5); padding: clamp(3px, 0.4vw, 7px) clamp(6px, 0.6vw, 9px); border-radius: 2px; display: flex; flex-direction: column; justify-content: center; min-height: 0; overflow: hidden; }
+  .wx-cell .c { font: 600 9.5px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .wx-cell .t { font-family: "JetBrains Mono", monospace; font-size: clamp(12px, 1vw, 17px); font-weight: 500; color: var(--text); line-height: 1.1; }
+  .wx-cell .sub { font-size: 9.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .mkt-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: clamp(10.5px, 0.72vw, 12px); }
   .mkt-row:last-child { border-bottom: 0; }
@@ -315,10 +317,7 @@
   .bt-item .v { color: var(--text); }
   .bt-item .c.up { color: var(--green); } .bt-item .c.down { color: var(--red); } .bt-item .c.flat { color: var(--dim); }
 
-  /* Scrollbars */
-  .pbody::-webkit-scrollbar { width: 6px; }
-  .pbody::-webkit-scrollbar-track { background: transparent; }
-  .pbody::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+  /* No scrollbars anywhere — fitRender() in the script trims lists to fit. */
 </style>
 </head>
 <body>
@@ -477,8 +476,9 @@ function renderWorkspace() {
   const unread = inbox.filter(i => i.unread).length;
   document.getElementById("ws-unread").textContent = unread ? `${unread}` : "";
 
+  let html = "";
   if (workspaceTab === "inbox") {
-    body.innerHTML = inbox.map(i => `
+    html = inbox.map(i => `
       <div class="ws-item ws-inbox">
         <span class="dot ${i.unread ? 'unread' : 'read'}"></span>
         <div>
@@ -488,14 +488,14 @@ function renderWorkspace() {
         <span class="ts">${i.time}</span>
       </div>`).join("");
   } else if (workspaceTab === "tasks") {
-    body.innerHTML = tasks.map(t => `
+    html = tasks.map(t => `
       <div class="ws-item ws-task ${t.done ? 'done' : ''}">
         <span class="check ${t.done ? 'done' : ''}">${t.done ? '✓' : ''}</span>
         <div class="title">${t.title}</div>
         ${t.due ? `<span class="due">◴ ${t.due}</span>` : `<span></span>`}
       </div>`).join("");
   } else {
-    body.innerHTML = signals.map(s => `
+    html = signals.map(s => `
       <div class="ws-item ws-signal">
         <div>
           <div class="sender">${s.sender}</div>
@@ -504,6 +504,7 @@ function renderWorkspace() {
         <span class="ts">${s.time}</span>
       </div>`).join("");
   }
+  fitRender(body, html);
 }
 
 document.getElementById("ws-tabs").addEventListener("click", e => {
@@ -545,6 +546,26 @@ const tip = document.getElementById("tooltip");
 
 function clsChg(x){ return x > 0 ? "up" : x < 0 ? "down" : "flat"; }
 function arrow(x) { return x > 0 ? "▲" : x < 0 ? "▼" : "■"; }
+
+/* Render a list of items into a container, then trim any children that
+ * overflow the container height. Keeps at least one child so an empty-looking
+ * panel doesn't happen if a single item is taller than the viewport. */
+function fitRender(container, html) {
+  container.innerHTML = html;
+  requestAnimationFrame(() => {
+    const avail = container.clientHeight;
+    if (!avail) return;
+    let used = 0;
+    const kids = Array.from(container.children);
+    for (let i = 0; i < kids.length; i++) {
+      used += kids[i].offsetHeight;
+      if (used > avail && i >= 1) {
+        for (let j = i; j < kids.length; j++) kids[j].remove();
+        break;
+      }
+    }
+  });
+}
 
 let MAP = null;
 
@@ -690,7 +711,7 @@ function renderEvents() {
   const items = (STATE.major_news || []).concat(STATE.minor_news || []);
   const filtered = currentRegion ? items.filter(x => x.region === currentRegion) : items;
   document.getElementById("event-count").textContent = `${filtered.length} events`;
-  document.getElementById("events").innerHTML = filtered.slice(0, 40).map(a => `
+  const html = filtered.slice(0, 40).map(a => `
     <a class="event r-${a.region}" href="${a.url}" target="_blank" rel="noopener">
       <span class="ring"></span>
       <div class="body">
@@ -699,6 +720,7 @@ function renderEvents() {
       </div>
       <span class="ts">${relTime(a.published_at || a.fetched_at)}</span>
     </a>`).join("");
+  fitRender(document.getElementById("events"), html);
 }
 document.getElementById("region-pills").addEventListener("click", e => {
   if (e.target.tagName !== "BUTTON") return;
@@ -719,12 +741,13 @@ function renderWx(cities) {
 }
 
 function mktRows(container, items) {
-  document.getElementById(container).innerHTML = items.map(q => `
+  const html = items.map(q => `
     <div class="mkt-row">
       <span class="lbl">${q.label}</span>
       <span class="val">${fmtNum(q.price)}</span>
       <span class="chg ${clsChg(q.change_pct)}">${arrow(q.change_pct)} ${fmtPct(q.change_pct)}</span>
     </div>`).join("");
+  fitRender(document.getElementById(container), html);
 }
 
 function renderTicker(all) {
@@ -803,12 +826,20 @@ async function boot() {
 }
 boot();
 
-// Re-fit the map when the viewport changes. Debounced so fast drags don't thrash.
+// On viewport change: re-fit the map AND re-trim every list so the new
+// panel heights are honored. Debounced so fast drags don't thrash d3.
 let resizeT = null;
 window.addEventListener("resize", () => {
-  if (!STATE) return;
   clearTimeout(resizeT);
-  resizeT = setTimeout(() => renderMap((STATE.major_news || []).concat(STATE.minor_news || [])), 150);
+  resizeT = setTimeout(() => {
+    renderWorkspace();
+    if (!STATE) return;
+    renderEvents();
+    mktRows("commodities", STATE.markets.commodity);
+    mktRows("indices",     STATE.markets.index);
+    mktRows("fx",          STATE.markets.fx);
+    renderMap((STATE.major_news || []).concat(STATE.minor_news || []));
+  }, 150);
 });
 
 // Refresh dynamic widgets every 60s so the tape feels alive without reloads.
