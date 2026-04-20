@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Command — News Aggregator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B1220;
+    --bg-2: #0F172A;
+    --card: #111A2E;
+    --card-2: #142037;
+    --border: #1E2A44;
+    --border-2: #2A3A5A;
+    --text: #E8ECF5;
+    --muted: #8893A8;
+    --dim: #5B6478;
+    --accent: #7AB6FF;
+    --up: #3CCB7F;
+    --down: #F06A6A;
+    --glow: rgba(122, 182, 255, 0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); min-height: 100%; }
+  body {
+    font-family: "Inter", system-ui, sans-serif; font-size: 13.5px; line-height: 1.45;
+    background-image: radial-gradient(1200px 600px at 20% -10%, var(--glow), transparent);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+  a:hover { color: var(--accent); }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  /* Top bar */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px; border-bottom: 1px solid var(--border);
+    background: rgba(11, 18, 32, 0.8); backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.01em; font-size: 15px; }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up); box-shadow: 0 0 0 3px rgba(60,203,127,0.18); }
+  .meta { display: flex; gap: 22px; color: var(--muted); font-size: 12px; }
+  .meta .kv span { color: var(--text); margin-left: 6px; }
+
+  main { max-width: 1520px; margin: 0 auto; padding: 22px 28px 120px; display: grid; gap: 16px; }
+
+  /* Ticker row */
+  .ticker-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+  }
+  .ticker {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; position: relative;
+    transition: border-color .18s, transform .18s;
+  }
+  .ticker:hover { border-color: var(--border-2); }
+  .ticker .lbl { color: var(--muted); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 6px; }
+  .ticker .val { font-family: "IBM Plex Mono", monospace; font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+  .ticker .chg { font-family: "IBM Plex Mono", monospace; font-size: 12px; margin-top: 4px; font-weight: 500; }
+  .ticker .chg.up { color: var(--up); }
+  .ticker .chg.down { color: var(--down); }
+  .ticker .chg.flat { color: var(--dim); }
+
+  /* Main content row: hero + weather side */
+  .row-hero {
+    display: grid; grid-template-columns: 2fr 1fr; gap: 16px;
+  }
+  @media (max-width: 1080px) { .row-hero { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; position: relative;
+  }
+  .card .head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  }
+  .card .head h2 { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .card .head .badge { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); background: rgba(122,182,255,0.08); padding: 3px 8px; border-radius: 999px; }
+
+  .hero-lead h1 { font-size: 26px; font-weight: 600; line-height: 1.2; letter-spacing: -0.015em; margin-bottom: 10px; }
+  .hero-lead .dek { color: #B4BDD0; font-size: 14px; line-height: 1.55; margin-bottom: 12px; max-width: 60ch; }
+  .hero-lead .byline { color: var(--muted); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; }
+  .hero-lead .byline .src { color: var(--accent); }
+
+  .hero-lead .more { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+  .hero-lead .more a { font-size: 13.5px; color: var(--text); display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
+  .hero-lead .more a:hover { color: var(--accent); }
+  .hero-lead .more .small { color: var(--dim); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+
+  /* Weather card */
+  .wx-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .wx-cell { background: var(--card-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .wx-cell .city { font-size: 12.5px; font-weight: 500; margin-bottom: 2px; }
+  .wx-cell .cond { color: var(--muted); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+  .wx-cell .temp { font-family: "IBM Plex Mono", monospace; font-size: 20px; font-weight: 500; margin-top: 6px; }
+  .wx-cell .hl { color: var(--muted); font-size: 10.5px; margin-top: 1px; font-family: "IBM Plex Mono", monospace; }
+
+  /* Minor news grid */
+  .minor-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 1200px) { .minor-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 860px)  { .minor-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px)  { .minor-grid { grid-template-columns: 1fr; } }
+  .story {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
+    transition: border-color .15s;
+  }
+  .story:hover { border-color: var(--border-2); }
+  .story .src { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .story h4 { font-size: 14.5px; font-weight: 500; line-height: 1.32; }
+  .story p { color: #96A0B6; font-size: 12.5px; line-height: 1.5; }
+  .story .foot { margin-top: auto; color: var(--dim); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+
+  /* Region tabs */
+  .region-tabs { display: flex; gap: 4px; padding: 4px; background: var(--card-2); border-radius: 10px; border: 1px solid var(--border); font-size: 12px; }
+  .region-tabs button {
+    background: transparent; color: var(--muted); border: 0; cursor: pointer;
+    padding: 7px 12px; border-radius: 7px; font: inherit; letter-spacing: .04em;
+  }
+  .region-tabs button.active { background: var(--card); color: var(--text); }
+  .region-tabs button:hover { color: var(--text); }
+
+  .stamp { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--dim); }
+  .choose { color: var(--muted); font-size: 12px; }
+  .choose:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><span class="dot"></span> <span>GULF COMMAND</span></div>
+  <div class="meta">
+    <div class="kv">Updated <span class="stamp mono" id="stamp">—</span></div>
+    <a class="choose" href="../">← other designs</a>
+  </div>
+</div>
+
+<main>
+
+  <div class="ticker-row" id="tickers"></div>
+
+  <div class="row-hero">
+    <section class="card hero-lead">
+      <div class="head"><h2>Lead story</h2><span class="badge" id="lead-region">—</span></div>
+      <div id="lead"></div>
+      <div class="more" id="more"></div>
+    </section>
+    <section class="card">
+      <div class="head"><h2>Region weather</h2><span class="badge">Gulf</span></div>
+      <div class="wx-list" id="wx"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="head">
+      <h2>Further reading</h2>
+      <div class="region-tabs" id="tabs">
+        <button data-r="" class="active">All</button>
+        <button data-r="gulf">Gulf</button>
+        <button data-r="iran_war">Iran/War</button>
+        <button data-r="oil_markets">Oil</button>
+        <button data-r="markets_macro">Macro</button>
+        <button data-r="global">Global</button>
+      </div>
+    </div>
+    <div class="minor-grid" id="minor"></div>
+  </section>
+
+</main>
+
+<script type="module">
+import { loadSnapshot, fmtPct, fmtNum, relTime, errorBanner } from "../shared.js";
+
+function cls(x) { return x > 0 ? "up" : x < 0 ? "down" : "flat"; }
+function arrow(x) { return x > 0 ? "▲" : x < 0 ? "▼" : "•"; }
+
+let STATE = null;
+
+function renderTickers(all) {
+  const top = all.commodity.concat(all.index).concat(all.fx.slice(0, 3));
+  document.getElementById("tickers").innerHTML = top.map(q => `
+    <div class="ticker">
+      <div class="lbl">${q.label}</div>
+      <div class="val mono">${fmtNum(q.price)}</div>
+      <div class="chg ${cls(q.change_pct)}">${arrow(q.change_pct)} ${fmtPct(q.change_pct)}</div>
+    </div>`).join("");
+}
+
+function renderLead(majors) {
+  if (!majors.length) {
+    document.getElementById("lead").innerHTML = "<p style='color:#8893A8'>No major stories yet — first ingest may still be running.</p>";
+    return;
+  }
+  const [lead, ...rest] = majors;
+  document.getElementById("lead-region").textContent = lead.region.replace("_"," ");
+  document.getElementById("lead").innerHTML = `
+    <h1><a href="${lead.url}" target="_blank" rel="noopener">${lead.title}</a></h1>
+    <p class="dek">${lead.summary || ""}</p>
+    <div class="byline"><span class="src">${lead.source}</span> · ${relTime(lead.published_at || lead.fetched_at)}</div>`;
+  document.getElementById("more").innerHTML = rest.slice(0, 5).map(s => `
+    <a href="${s.url}" target="_blank" rel="noopener">
+      <span>${s.title}</span>
+      <span class="small">${s.source}</span>
+    </a>`).join("");
+}
+
+function renderMinor(items, region) {
+  const show = region ? items.filter(x => x.region === region) : items;
+  const html = show.slice(0, 16).map(s => `
+    <a class="story" href="${s.url}" target="_blank" rel="noopener">
+      <div class="src">${s.source}</div>
+      <h4>${s.title}</h4>
+      <p>${(s.summary || "").slice(0, 120)}${(s.summary||"").length > 120 ? "…" : ""}</p>
+      <div class="foot">${s.region.replace("_"," ")} · ${relTime(s.published_at || s.fetched_at)}</div>
+    </a>`).join("");
+  document.getElementById("minor").innerHTML = html || "<p style='color:#8893A8;padding:8px'>No stories in this region yet.</p>";
+}
+
+function renderWx(cities) {
+  document.getElementById("wx").innerHTML = cities.map(c => `
+    <div class="wx-cell">
+      <div class="city">${c.city}</div>
+      <div class="cond">${c.summary || "—"}</div>
+      <div class="temp">${c.temp_c?.toFixed(0) ?? "—"}°</div>
+      <div class="hl">H${c.high_c?.toFixed(0) ?? "—"} L${c.low_c?.toFixed(0) ?? "—"}</div>
+    </div>`).join("");
+}
+
+document.getElementById("tabs").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  renderMinor(STATE.minor_news, e.target.dataset.r);
+});
+
+(async () => {
+  try {
+    STATE = await loadSnapshot();
+    document.getElementById("stamp").textContent =
+      new Date(STATE.generated_at).toLocaleTimeString(undefined, {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    renderTickers(STATE.markets);
+    renderLead(STATE.major_news);
+    renderMinor(STATE.minor_news, "");
+    renderWx(STATE.weather);
+  } catch (e) {
+    document.body.prepend(errorBanner(e));
+  }
+})();
+</script>
+</body>
+</html>

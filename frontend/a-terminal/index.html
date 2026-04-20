@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Terminal — News Aggregator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0A0B;
+    --panel: #141418;
+    --panel-2: #18181D;
+    --border: #24242A;
+    --border-2: #3A3A42;
+    --text: #ECECEE;
+    --muted: #8C8C92;
+    --dim: #5F5F66;
+    --up: #6AD09A;
+    --down: #E06A6A;
+    --accent: #D6B87A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); }
+  body {
+    font-family: "Inter", system-ui, sans-serif; font-size: 14px; line-height: 1.45;
+    min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+  a:hover { color: var(--accent); }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .serif { font-family: "Fraunces", Georgia, serif; }
+
+  /* Top ticker */
+  .tickers {
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    overflow: hidden; white-space: nowrap;
+    padding: 10px 0;
+  }
+  .ticker-track { display: inline-flex; gap: 36px; animation: scroll 90s linear infinite; padding-left: 100%; }
+  @keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+  .tick { font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: .02em; }
+  .tick .lbl { color: var(--muted); margin-right: 8px; text-transform: uppercase; font-size: 10.5px; letter-spacing: .1em; }
+  .tick .val { color: var(--text); }
+  .tick .chg.up { color: var(--up); }
+  .tick .chg.down { color: var(--down); }
+  .tick .chg.flat { color: var(--dim); }
+
+  /* Header */
+  header.masthead {
+    padding: 22px 36px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .brand {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 26px; letter-spacing: -0.01em;
+  }
+  .brand em { color: var(--accent); font-style: normal; font-weight: 700; }
+  .meta { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+
+  /* Layout */
+  main { max-width: 1440px; margin: 0 auto; padding: 28px 36px 120px; }
+  .hero {
+    display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; margin-bottom: 40px;
+    padding-bottom: 32px; border-bottom: 1px solid var(--border);
+  }
+  .hero-main .kicker {
+    color: var(--accent); font-size: 11px; font-weight: 600;
+    letter-spacing: .18em; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .hero-main h1 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 44px; line-height: 1.08;
+    letter-spacing: -0.015em; margin-bottom: 16px;
+  }
+  .hero-main .summary { color: #C4C4CA; font-size: 15.5px; line-height: 1.55; margin-bottom: 16px; max-width: 58ch; }
+  .hero-main .byline { color: var(--muted); font-size: 12px; letter-spacing: .05em; text-transform: uppercase; }
+  .hero-main .byline .src { color: var(--accent); }
+
+  .hero-side { border-left: 1px solid var(--border); padding-left: 28px; display: flex; flex-direction: column; gap: 22px; }
+  .side-item h3 { font-family: "Fraunces", serif; font-weight: 500; font-size: 18px; line-height: 1.25; margin-bottom: 6px; }
+  .side-item .meta-row { color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+
+  /* Section headings */
+  h2.section {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 14px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--muted);
+    padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 22px;
+  }
+
+  /* Minor news grid */
+  .minor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 32px; margin-bottom: 48px; }
+  @media (max-width: 1000px) { .minor-grid { grid-template-columns: repeat(2, 1fr); } .hero { grid-template-columns: 1fr; } .hero-side { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 22px; } }
+  @media (max-width: 640px) { .minor-grid { grid-template-columns: 1fr; } }
+  .story { border-top: 1px solid var(--border); padding-top: 16px; }
+  .story .tag-src { color: var(--accent); font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase; font-weight: 600; }
+  .story h4 { font-family: "Fraunces", serif; font-weight: 500; font-size: 18px; line-height: 1.25; margin: 8px 0 10px; }
+  .story p { color: #9C9CA4; font-size: 13.5px; line-height: 1.5; margin-bottom: 8px; }
+  .story .ts { color: var(--dim); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+
+  /* Markets/Weather strip */
+  .strip { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 16px; padding-top: 32px; border-top: 1px solid var(--border); }
+  @media (max-width: 900px) { .strip { grid-template-columns: 1fr; } }
+  .market-table { width: 100%; border-collapse: collapse; }
+  .market-table th { text-align: left; color: var(--muted); font-size: 10px; letter-spacing: .15em; text-transform: uppercase; font-weight: 500; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--border); }
+  .market-table td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--panel-2); font-size: 13px; }
+  .market-table td.num { text-align: right; font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+  .market-table .chg.up { color: var(--up); }
+  .market-table .chg.down { color: var(--down); }
+  .market-table .chg.flat { color: var(--dim); }
+
+  .weather-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .wx { border: 1px solid var(--border); background: var(--panel); padding: 12px 14px; border-radius: 2px; }
+  .wx .city { font-family: "Fraunces", serif; font-weight: 500; font-size: 14px; margin-bottom: 2px; }
+  .wx .cond { font-size: 11px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .wx .temp { font-family: "JetBrains Mono", monospace; font-size: 22px; font-weight: 500; margin-top: 6px; }
+  .wx .hl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  footer { color: var(--dim); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 36px 36px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+  .choose { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="tickers"><div class="ticker-track" id="ticker">Loading markets…</div></div>
+
+<header class="masthead">
+  <div class="brand">The <em>Gulf</em> Brief</div>
+  <div class="meta" id="stamp">—</div>
+</header>
+
+<main>
+  <section class="hero" id="hero">
+    <div class="hero-main"><div class="kicker">Lead story</div><h1>Loading…</h1></div>
+    <aside class="hero-side"></aside>
+  </section>
+
+  <h2 class="section">Further reading</h2>
+  <div class="minor-grid" id="minor"></div>
+
+  <div class="strip">
+    <div>
+      <h2 class="section">Markets</h2>
+      <table class="market-table" id="markets"><thead><tr><th>Instrument</th><th style="text-align:right">Last</th><th style="text-align:right">Chg</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div>
+      <h2 class="section">Region</h2>
+      <div class="weather-grid" id="weather"></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Gulf Brief · Private</span>
+  <a class="choose" href="../">← Pick a different design</a>
+</footer>
+
+<script type="module">
+import { loadSnapshot, fmtPct, fmtNum, relTime, errorBanner } from "../shared.js";
+
+function cls(x) { return x > 0 ? "up" : x < 0 ? "down" : "flat"; }
+function arrow(x) { return x > 0 ? "▲" : x < 0 ? "▼" : "◆"; }
+
+function renderTicker(all) {
+  const strip = all.commodity.concat(all.index, all.fx);
+  const html = strip.map(q => `
+    <span class="tick"><span class="lbl">${q.label}</span><span class="val">${fmtNum(q.price)}</span>
+      <span class="chg ${cls(q.change_pct)}"> ${arrow(q.change_pct)} ${fmtPct(q.change_pct)}</span></span>
+  `).join("");
+  // Duplicate for seamless marquee
+  document.getElementById("ticker").innerHTML = html + html;
+}
+
+function renderHero(majors) {
+  const root = document.getElementById("hero");
+  if (!majors.length) { root.innerHTML = "<p style='color:#8C8C92'>No major stories yet — first ingest may still be running.</p>"; return; }
+  const lead = majors[0];
+  const side = majors.slice(1, 5);
+  root.innerHTML = `
+    <div class="hero-main">
+      <div class="kicker">Lead · ${lead.region.replace("_"," ")}</div>
+      <h1><a href="${lead.url}" target="_blank" rel="noopener">${lead.title}</a></h1>
+      <p class="summary">${lead.summary || ""}</p>
+      <div class="byline"><span class="src">${lead.source}</span> · ${relTime(lead.published_at || lead.fetched_at)}</div>
+    </div>
+    <aside class="hero-side">
+      ${side.map(s => `
+        <div class="side-item">
+          <h3><a href="${s.url}" target="_blank" rel="noopener">${s.title}</a></h3>
+          <div class="meta-row">${s.source} · ${relTime(s.published_at || s.fetched_at)}</div>
+        </div>
+      `).join("")}
+    </aside>`;
+}
+
+function renderMinor(items) {
+  document.getElementById("minor").innerHTML = items.slice(0, 15).map(s => `
+    <article class="story">
+      <div class="tag-src">${s.source}</div>
+      <h4><a href="${s.url}" target="_blank" rel="noopener">${s.title}</a></h4>
+      <p>${(s.summary || "").slice(0, 160)}${(s.summary||"").length > 160 ? "…" : ""}</p>
+      <div class="ts">${relTime(s.published_at || s.fetched_at)}</div>
+    </article>`).join("");
+}
+
+function renderMarkets(all) {
+  const tbody = document.querySelector("#markets tbody");
+  const rows = all.commodity.concat(all.index, all.fx);
+  tbody.innerHTML = rows.map(q => `
+    <tr><td>${q.label}</td><td class="num">${fmtNum(q.price)}</td><td class="num chg ${cls(q.change_pct)}">${arrow(q.change_pct)} ${fmtPct(q.change_pct)}</td></tr>
+  `).join("");
+}
+
+function renderWeather(cities) {
+  document.getElementById("weather").innerHTML = cities.map(c => `
+    <div class="wx">
+      <div class="city">${c.city}</div>
+      <div class="cond">${c.summary || "—"}</div>
+      <div class="temp">${c.temp_c?.toFixed(0) ?? "—"}°</div>
+      <div class="hl">H ${c.high_c?.toFixed(0) ?? "—"}° · L ${c.low_c?.toFixed(0) ?? "—"}°</div>
+    </div>`).join("");
+}
+
+(async () => {
+  try {
+    const data = await loadSnapshot();
+    document.getElementById("stamp").textContent =
+      new Date(data.generated_at).toLocaleString(undefined, {weekday:"short",year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+    renderTicker(data.markets);
+    renderHero(data.major_news);
+    renderMinor(data.minor_news);
+    renderMarkets(data.markets);
+    renderWeather(data.weather);
+  } catch (e) {
+    document.body.prepend(errorBanner(e));
+  }
+})();
+</script>
+</body>
+</html>

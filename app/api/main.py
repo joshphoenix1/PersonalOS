@@ -4,8 +4,11 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api import selectors
 from app.config import settings
@@ -74,3 +77,10 @@ def markets():
 @app.get("/api/weather")
 def weather():
     return {"cities": selectors.get_weather()}
+
+
+# Mount the local frontend prototypes at the root so one uvicorn serves both.
+# Registered AFTER API routes so /api/* still wins.
+_frontend = Path(__file__).resolve().parents[2] / "frontend"
+if _frontend.exists():
+    app.mount("/", StaticFiles(directory=_frontend, html=True), name="frontend")
