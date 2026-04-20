@@ -163,6 +163,27 @@
   .corner .k { color: var(--dim); margin-right: 6px; }
   .corner .v { color: var(--cyan); font-weight: 600; }
 
+  /* Zoom controls — placed below the top-right corner telemetry so they don't overlap */
+  .zoomctl {
+    position: absolute; top: 44px; right: 14px; display: flex; flex-direction: column;
+    gap: 4px; z-index: 3; pointer-events: auto;
+  }
+  .zoomctl button {
+    width: 28px; height: 28px; background: rgba(10, 18, 32, 0.85);
+    border: 1px solid var(--border-2); color: var(--cyan);
+    font: 500 15px/1 "JetBrains Mono", monospace; cursor: pointer; border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .15s, background .15s;
+  }
+  .zoomctl button:hover { border-color: var(--cyan); background: rgba(0, 212, 255, 0.1); }
+  .zoomctl button:active { background: rgba(0, 212, 255, 0.18); }
+  .zoomctl .hint {
+    font: 500 9px "JetBrains Mono", monospace; letter-spacing: .12em; color: var(--dim);
+    text-transform: uppercase; text-align: center; margin-top: 4px; writing-mode: vertical-rl; transform: rotate(180deg);
+  }
+  #map { cursor: grab; }
+  #map:active { cursor: grabbing; }
+
   /* Reticle crosshairs */
   .reticle { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
   .reticle svg { width: 100%; height: 100%; opacity: 0.35; }
@@ -300,10 +321,15 @@
         </svg>
       </div>
       <div class="map-corners">
-        <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">MIDDLE EAST</span></div>
+        <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">GULF</span></div>
         <div class="corner tr"><span class="k">HOTSPOTS</span><span class="v" id="c-spots">—</span></div>
         <div class="corner bl"><span class="k">SOURCES ACTIVE</span><span class="v" id="c-src">—</span></div>
         <div class="corner br"><span class="k">LAST SYNC</span><span class="v mono" id="c-sync">—</span></div>
+      </div>
+      <div class="zoomctl">
+        <button data-zoom="in"  title="Zoom in">+</button>
+        <button data-zoom="out" title="Zoom out">−</button>
+        <button data-zoom="reset" title="Reset to Gulf">⟲</button>
       </div>
     </div>
   </section>
@@ -361,10 +387,16 @@ const HOTSPOTS = [
   { key: "cairo",     name: "Cairo",     lat: 30.04, lon: 31.23, region: "global",   match: t => /egypt|cairo|suez/i.test(t) },
 ];
 
-// Bounding box the map zooms to (roughly: Egypt/Libya → Iran/Pakistan, Caucasus → Yemen).
+// The projection is fitted to the wider Middle East bbox so that zooming out
+// stays meaningful. The *initial* view is computed from the tighter Gulf bbox
+// and applied via a zoom transform on load.
 const ME_BBOX = {
   type: "Feature",
   geometry: { type: "Polygon", coordinates: [[[25, 10], [65, 10], [65, 42], [25, 42], [25, 10]]] }
+};
+const GULF_BBOX = {
+  type: "Feature",
+  geometry: { type: "Polygon", coordinates: [[[42, 17], [60, 17], [60, 32], [42, 32], [42, 17]]] }
 };
 
 let STATE = null;
@@ -374,6 +406,8 @@ function clsChg(x){ return x > 0 ? "up" : x < 0 ? "down" : "flat"; }
 function arrow(x) { return x > 0 ? "▲" : x < 0 ? "▼" : "■"; }
 
 /* ---------------- Map ---------------- */
+let MAP = null;  // holds projection + zoom handle across redraws
+
 async function renderMap(articles) {
   const svg = d3.select("#map");
   const pbody = document.querySelector(".map-wrap .pbody");
@@ -382,67 +416,117 @@ async function renderMap(articles) {
   svg.attr("viewBox", `0 0 ${w} ${h}`).attr("width", w).attr("height", h);
   svg.selectAll("*").remove();
 
-  // Higher-res 50m atlas gives cleaner country outlines at Middle-East zoom.
+  // 50m atlas has enough detail for a Gulf-zoom view.
   const topology = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json").then(r => r.json());
   const land = topojson.feature(topology, topology.objects.countries);
   const borders = topojson.mesh(topology, topology.objects.countries, (a, b) => a !== b);
 
-  // Fit projection to the ME bounding box, with a small inset.
+  // Projection fits the wider Middle East — zoom-out remains meaningful.
   const projection = d3.geoMercator().fitExtent([[12, 12], [w - 12, h - 12]], ME_BBOX);
   const path = d3.geoPath(projection);
 
-  // Clip everything to the viewport so countries that extend past the bbox
-  // (Pakistan, India, Libya, Turkey, etc.) crop cleanly at the panel edge.
+  // Clip to panel so countries extending past the bbox crop cleanly.
   svg.append("defs").append("clipPath").attr("id", "mapclip")
     .append("rect").attr("x", 0).attr("y", 0).attr("width", w).attr("height", h);
-  const g = svg.append("g").attr("clip-path", "url(#mapclip)");
 
-  // Graticule — 5° step suits a regional zoom.
+  // Two layers: `mapLayer` takes the zoom transform (pan/zoom moves countries);
+  // `spotLayer` repositions hotspots manually so their circles/labels stay the
+  // same visual size at every zoom level.
+  const root = svg.append("g").attr("clip-path", "url(#mapclip)");
+  const mapLayer  = root.append("g").attr("class", "map-layer");
+  const spotLayer = root.append("g").attr("class", "spot-layer");
+
+  // Map content
   const graticule = d3.geoGraticule().step([5, 5]);
-  g.append("path").attr("class", "graticule").attr("d", path(graticule()));
+  mapLayer.append("path").attr("class", "graticule").attr("d", path(graticule())).attr("vector-effect", "non-scaling-stroke");
+  mapLayer.append("g").selectAll("path").data(land.features)
+    .join("path").attr("class", "country").attr("d", path).attr("vector-effect", "non-scaling-stroke");
+  mapLayer.append("path").attr("class", "outline").attr("d", path(borders)).attr("vector-effect", "non-scaling-stroke");
 
-  // Country fills + country borders (more visible than a single mesh outline).
-  g.append("g").selectAll("path").data(land.features)
-    .join("path").attr("class", "country").attr("d", path);
-  g.append("path").attr("class", "outline").attr("d", path(borders));
-
-  // Count articles per hotspot
-  const counts = {};
-  const topByHotspot = {};
-  for (const h of HOTSPOTS) {
-    counts[h.key] = 0;
-    topByHotspot[h.key] = [];
-  }
+  // Article → hotspot counts
+  const counts = Object.fromEntries(HOTSPOTS.map(h => [h.key, 0]));
+  const topByHotspot = Object.fromEntries(HOTSPOTS.map(h => [h.key, []]));
   for (const a of articles) {
-    for (const h of HOTSPOTS) {
-      if (h.match(a.title + " " + (a.summary||""))) {
-        counts[h.key]++;
-        if (topByHotspot[h.key].length < 3) topByHotspot[h.key].push(a);
+    for (const hs of HOTSPOTS) {
+      if (hs.match(a.title + " " + (a.summary || ""))) {
+        counts[hs.key]++;
+        if (topByHotspot[hs.key].length < 3) topByHotspot[hs.key].push(a);
       }
     }
   }
 
-  const spots = g.append("g");
-  for (const h of HOTSPOTS) {
-    const [cx, cy] = projection([h.lon, h.lat]);
-    const n = counts[h.key];
-    if (!Number.isFinite(cx)) continue;
-    const group = spots.append("g")
-      .attr("class", `spot r-${h.region}`)
-      .attr("transform", `translate(${cx},${cy})`)
-      .on("mousemove", (ev) => showTip(ev, h, topByHotspot[h.key], n))
-      .on("mouseleave", hideTip);
-    group.append("circle").attr("class", "spot-pulse").attr("r", 4);
-    group.append("circle").attr("class", "spot-pulse").attr("r", 4).style("animation-delay", "1.3s");
-    const core = Math.max(2.6, Math.min(6, 2.8 + Math.log(1 + n) * 1.0));
-    group.append("circle").attr("class", "spot-core").attr("r", core).attr("opacity", n > 0 ? 1 : 0.4);
-    // All hotspots get a label now that the map is regional and there's room.
-    group.append("text").attr("class", "spot-label").attr("x", core + 5).attr("y", 3).text(h.name.toUpperCase());
+  // Data-bind hotspots so we can reposition them in the zoom handler.
+  const spot = spotLayer.selectAll(".spot").data(HOTSPOTS, d => d.key).join("g")
+    .attr("class", d => `spot r-${d.region}`)
+    .on("mousemove", (ev, d) => showTip(ev, d, topByHotspot[d.key], counts[d.key]))
+    .on("mouseleave", hideTip);
+  spot.append("circle").attr("class", "spot-pulse").attr("r", 4);
+  spot.append("circle").attr("class", "spot-pulse").attr("r", 4).style("animation-delay", "1.3s");
+  spot.append("circle").attr("class", "spot-core")
+    .attr("r", d => Math.max(2.6, Math.min(6, 2.8 + Math.log(1 + counts[d.key]) * 1.0)))
+    .attr("opacity", d => counts[d.key] > 0 ? 1 : 0.4);
+  spot.append("text").attr("class", "spot-label")
+    .attr("x", d => Math.max(2.6, Math.min(6, 2.8 + Math.log(1 + counts[d.key]) * 1.0)) + 5)
+    .attr("y", 3)
+    .text(d => d.name.toUpperCase());
+
+  function positionSpots(transform) {
+    spot.attr("transform", d => {
+      const [x, y] = projection([d.lon, d.lat]);
+      return `translate(${transform.applyX(x)}, ${transform.applyY(y)})`;
+    });
   }
 
-  // Update corners
+  // Zoom behavior
+  const zoom = d3.zoom()
+    .scaleExtent([0.6, 10])
+    .on("zoom", (event) => {
+      mapLayer.attr("transform", event.transform);
+      positionSpots(event.transform);
+      document.getElementById("c-view").textContent = `${event.transform.k.toFixed(1)}× · ${describeView(event.transform, projection, w, h)}`;
+    });
+  svg.call(zoom);
+  // Double-click default is noisy; keep wheel + drag only.
+  svg.on("dblclick.zoom", null);
+
+  // Compute initial transform that shows only the Gulf bbox, centered.
+  const [[x0, y0], [x1, y1]] = path.bounds(GULF_BBOX);
+  const bx = Math.max(1, x1 - x0), by = Math.max(1, y1 - y0);
+  const k = Math.min(w / bx, h / by) * 0.95;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const initial = d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(k);
+  svg.call(zoom.transform, initial);
+
+  // Update corner counters
   const active = HOTSPOTS.filter(h => counts[h.key] > 0).length;
   document.getElementById("c-spots").textContent = `${active}/${HOTSPOTS.length}`;
+
+  MAP = { zoom, svg, initial, projection };
+}
+
+// Rough label for the current view: reports whether the user is looking at
+// Gulf-only, Middle East, or zoomed in tighter.
+function describeView(t, projection, w, h) {
+  const center = projection.invert ? projection.invert([(w/2 - t.x) / t.k, (h/2 - t.y) / t.k]) : null;
+  if (!center) return "MIDDLE EAST";
+  const [lon, lat] = center;
+  if (t.k > 4) return `${Math.abs(lat).toFixed(1)}°${lat>=0?"N":"S"} ${Math.abs(lon).toFixed(1)}°${lon>=0?"E":"W"}`;
+  if (t.k > 1.6) return "GULF";
+  return "MIDDLE EAST";
+}
+
+// Wire zoom control buttons after boot.
+function wireZoomControls() {
+  document.querySelectorAll("[data-zoom]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!MAP) return;
+      const action = btn.dataset.zoom;
+      const { zoom, svg, initial } = MAP;
+      if (action === "reset")   svg.transition().duration(500).call(zoom.transform, initial);
+      else if (action === "in") svg.transition().duration(250).call(zoom.scaleBy, 1.5);
+      else if (action === "out") svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.5);
+    });
+  });
 }
 
 function showTip(ev, h, items, n) {
@@ -576,6 +660,7 @@ async function boot() {
     renderTicker(STATE.markets);
     renderEvents();
     await renderMap((STATE.major_news || []).concat(STATE.minor_news || []));
+    wireZoomControls();
   } catch (e) {
     document.body.prepend(errorBanner(e));
   }
