@@ -394,9 +394,11 @@ const ME_BBOX = {
   type: "Feature",
   geometry: { type: "Polygon", coordinates: [[[25, 10], [65, 10], [65, 42], [25, 42], [25, 10]]] }
 };
+// Tighter, Dubai-centric default: shows full UAE, Qatar, Bahrain, eastern Saudi
+// (Dhahran/Dammam), southern Kuwait, Musandam, and the Iranian south coast.
 const GULF_BBOX = {
   type: "Feature",
-  geometry: { type: "Polygon", coordinates: [[[42, 17], [60, 17], [60, 32], [42, 32], [42, 17]]] }
+  geometry: { type: "Polygon", coordinates: [[[48, 22], [58, 22], [58, 29], [48, 29], [48, 22]]] }
 };
 
 let STATE = null;

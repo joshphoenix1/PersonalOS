@@ -171,3 +171,40 @@ REGION_WEIGHTS: dict[str, float] = {
     "global": 0.7,
     "drop": 0.0,
 }
+
+# Dubai-proximity post-multiplier. Applied as max(matched values) after the
+# main score is computed — so a story mentioning Dubai gets boosted 1.8×
+# regardless of what else is in it, while a Sanaa/Tehran story gets damped.
+# Geography roughly: the further the dominant place in the headline is from
+# Dubai (25.2°N 55.3°E), the smaller the multiplier.
+PROXIMITY_WEIGHTS: dict[str, float] = {
+    # Dubai and immediate UAE
+    "dubai": 1.85, "emaar": 1.75, "dp world": 1.75, "emirates airline": 1.7,
+    "etihad": 1.55, "jumeirah": 1.6, "mubadala": 1.55,
+    "uae": 1.55, "abu dhabi": 1.50, "sharjah": 1.45, "adnoc": 1.55,
+    "difc": 1.55, "adgm": 1.45,
+    # Gulf close-in (<400km)
+    "hormuz": 1.25, "doha": 1.15, "qatar": 1.15,
+    "bahrain": 1.10, "manama": 1.10,
+    "oman": 1.05, "muscat": 1.05,
+    # Eastern / central Saudi
+    "aramco": 1.25, "dhahran": 1.20, "dammam": 1.20, "khobar": 1.15,
+    "riyadh": 1.05, "saudi": 1.10, "saudi arabia": 1.10,
+    "neom": 1.10, "pif": 1.15, "public investment fund": 1.15,
+    # Kuwait
+    "kuwait": 0.95,
+    # Gulf/MENA further out
+    "jeddah": 0.90,
+    "iran": 0.85, "tehran": 0.80, "irgc": 0.85,
+    "iraq": 0.80, "baghdad": 0.80,
+    "houthi": 0.90, "yemen": 0.75, "sanaa": 0.75, "red sea": 1.00,
+    "israel": 0.75, "jerusalem": 0.70, "gaza": 0.80,
+    "lebanon": 0.70, "beirut": 0.70, "hezbollah": 0.75,
+    "syria": 0.70, "damascus": 0.70,
+    "egypt": 0.80, "cairo": 0.75, "suez": 0.95,
+    "jordan": 0.80, "amman": 0.75,
+    # Far global theaters — mostly decayed unless oil-adjacent
+    "china": 0.65, "beijing": 0.60, "hong kong": 0.65,
+    "london": 0.70, "brussels": 0.60, "frankfurt": 0.60, "paris": 0.60,
+    "new york": 0.70, "washington": 0.70, "federal reserve": 0.80,
+}

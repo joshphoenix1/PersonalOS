@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from app.config import KEYWORDS, REGION_WEIGHTS
+from app.config import KEYWORDS, PROXIMITY_WEIGHTS, REGION_WEIGHTS
 
 
 def _keyword_score(text: str, bucket: str) -> float:
@@ -73,5 +73,12 @@ def classify(article: dict[str, Any]) -> tuple[str, float]:
 
     # Any drop_score penalty still applies (softly) even if oil-adjacent kept it in.
     score = max(0.0, score + drop_score * 0.3)
+
+    # Dubai-proximity post-multiplier: take the strongest (max) match. Stories
+    # that mention Dubai directly win; stories about places far from Dubai are
+    # damped. Default 1.0 (no effect) when no proximity keywords hit.
+    prox_hits = [mult for kw, mult in PROXIMITY_WEIGHTS.items() if kw in text]
+    if prox_hits:
+        score *= max(prox_hits)
 
     return region, round(score, 4)
