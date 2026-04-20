@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     db_path: str = "./data/news.db"
+    pid_path: str = "./data/newsagg.pid"
     host: str = "127.0.0.1"
     port: int = 8000
     news_interval_min: int = 15

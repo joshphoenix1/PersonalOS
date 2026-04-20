@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from pathlib import Path
@@ -13,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import selectors
 from app.config import settings
 from app.db.init import init_db
+from app.pidlock import AlreadyRunning, acquire, release
 from app.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(
@@ -24,13 +26,20 @@ log = logging.getLogger("newsagg")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        acquire(settings.pid_path)
+    except AlreadyRunning as e:
+        log.error("refusing to start: %s", e)
+        raise
     init_db()
     start_scheduler()
-    log.info("newsagg started on %s:%s", settings.host, settings.port)
+    log.info("newsagg started on %s:%s (pid %d, lock %s)",
+             settings.host, settings.port, os.getpid(), settings.pid_path)
     try:
         yield
     finally:
         stop_scheduler()
+        release(settings.pid_path)
         log.info("newsagg stopped")
 
 
