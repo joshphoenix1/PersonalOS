@@ -30,11 +30,11 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
-  /* Body is a 4-row grid so topbar/schedule/main/ticker always fit the viewport. */
+  /* 3 rows — no more schedule strip; calendar lives in the left rail. */
   body {
     font-family: "Inter", system-ui, sans-serif;
     font-size: clamp(10.5px, 0.78vw, 13px); line-height: 1.4;
-    display: grid; grid-template-rows: 44px 56px minmax(0, 1fr) 34px;
+    display: grid; grid-template-rows: 44px minmax(0, 1fr) 34px;
     background:
       radial-gradient(1600px 800px at 70% 10%, rgba(0, 212, 255, 0.045), transparent 60%),
       radial-gradient(900px 500px at 10% 90%, rgba(230, 103, 255, 0.04), transparent 60%),
@@ -63,53 +63,42 @@
   .choose { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
   .choose:hover { color: var(--cyan); }
 
-  /* ---------- Schedule strip ---------- */
-  .schedule {
-    display: grid; grid-template-columns: 220px 1fr auto;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, rgba(10, 18, 32, 0.75), rgba(10, 18, 32, 0.55));
-    min-height: 0;
-  }
-  .schedule .sch-label {
-    display: flex; flex-direction: column; justify-content: center; padding: 0 18px;
-    border-right: 1px solid var(--border); background: rgba(0, 212, 255, 0.04);
-  }
-  .schedule .sch-label .k { font: 600 10px "JetBrains Mono", monospace; letter-spacing: .18em; color: var(--cyan); text-transform: uppercase; }
-  .schedule .sch-label .v { font: 500 12.5px "JetBrains Mono", monospace; color: var(--text); margin-top: 2px; }
-  .schedule .sch-label .v .hl { color: var(--amber); }
-  .schedule .sch-items {
-    display: flex; align-items: center; gap: 22px; padding: 0 20px; overflow: hidden;
-    font-size: clamp(11px, 0.78vw, 13px); min-width: 0;
-  }
-  .schedule .sch-item { display: flex; gap: 10px; align-items: baseline; white-space: nowrap; }
-  .schedule .sch-item .t { font: 600 11px "JetBrains Mono", monospace; color: var(--cyan); letter-spacing: .04em; }
-  .schedule .sch-item .sep { color: var(--dim); }
-  .schedule .sch-item .w { color: var(--text); }
-  .schedule .sch-item.done .t { color: var(--dim); }
-  .schedule .sch-item.done .w { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dim); }
-  .schedule .sch-item.now  .t { color: var(--amber); }
-  .schedule .sch-item.now  .w { color: var(--amber); }
-  .schedule .sch-note {
-    display: flex; align-items: center; padding: 0 18px; border-left: 1px solid var(--border);
-    font: 500 9.5px "JetBrains Mono", monospace; letter-spacing: .15em; color: var(--muted);
-    text-transform: uppercase; max-width: 220px; text-align: right;
-  }
-
-  /* ---------- Main layout ---------- */
-  /* Main row of the body-grid takes whatever height is left; columns split inside. */
+  /* ---------- Main layout: 3 cols, with personal taking the whole left ---------- */
   .main-grid {
     display: grid;
-    grid-template-columns: minmax(260px, 310px) minmax(0, 1fr) minmax(280px, 340px);
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr) minmax(280px, 330px);
     gap: 10px; padding: 10px;
-    min-height: 0;      /* critical so nested grids/flex can actually shrink */
-    overflow: hidden;
+    min-height: 0; overflow: hidden;
   }
-  @media (max-width: 1280px) { .main-grid { grid-template-columns: 280px 1fr 300px; } }
+  @media (max-width: 1280px) { .main-grid { grid-template-columns: 300px 1fr 280px; } }
   @media (max-width: 1080px) {
     .main-grid { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; overflow: visible; }
     html, body { overflow: auto; display: block; }
     body { height: auto; }
   }
+
+  /* Left rail: 4 stacked personal-data panels. Calendar biggest. */
+  .left-rail {
+    display: grid;
+    grid-template-rows: 1.55fr 1fr 0.9fr 0.7fr;
+    gap: 10px; min-height: 0;
+  }
+  @media (max-width: 1080px) { .left-rail { grid-template-rows: auto auto auto auto; } }
+
+  /* Center column: map on top (bigger), event feed below. */
+  .center-col {
+    display: grid;
+    grid-template-rows: 2.1fr 1fr;
+    gap: 10px; min-height: 0;
+  }
+  @media (max-width: 1080px) { .center-col { grid-template-rows: auto auto; } }
+
+  /* Right rail: 4 widgets. */
+  .right-rail {
+    display: grid; grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 10px; min-height: 0;
+  }
+  @media (max-width: 1080px) { .right-rail { grid-template-rows: repeat(4, auto); } }
 
   /* ---------- Panels (shared) ---------- */
   .panel {
@@ -134,23 +123,11 @@
     position: relative; z-index: 1; flex-shrink: 0;
   }
   .panel .phead .hcode { color: var(--muted); font-size: 10px; }
-  /* All panel bodies fill the remaining space. Never scroll — items that
-     don't fit are trimmed by fitRender() in the script, not by the browser. */
   .panel .pbody {
     flex: 1; min-height: 0; overflow: hidden;
     padding: 8px 12px; position: relative; z-index: 1;
   }
 
-  /* ---------- Left rail: workspace + events (grid split) ---------- */
-  .left-rail {
-    display: grid; grid-template-rows: 1fr 1fr; gap: 10px; min-height: 0;
-  }
-  @media (max-width: 1080px) {
-    .left-rail { grid-template-rows: auto auto; }
-  }
-  .left-rail .pbody { padding: 4px 10px; }
-
-  /* Tabs / pills (shared between workspace + event filter) */
   .pill-row { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 10px 6px; border-bottom: 1px dashed var(--border); flex-shrink: 0; }
   .pill { font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--border-2); border-radius: 3px; color: var(--muted); cursor: pointer; background: transparent; }
   .pill:hover { color: var(--text); border-color: var(--cyan-dim); }
@@ -163,7 +140,27 @@
   }
   .unread-badge:empty { display: none; }
 
-  /* ---------- Workspace items ---------- */
+  /* ---------- Calendar panel ---------- */
+  .cal-item {
+    display: grid; grid-template-columns: 52px 1fr; gap: 10px;
+    padding: 8px 6px; border-bottom: 1px solid var(--border);
+    align-items: start; position: relative;
+  }
+  .cal-item:last-child { border-bottom: 0; }
+  .cal-time {
+    font: 600 12.5px/1.1 "JetBrains Mono", monospace; color: var(--cyan);
+    letter-spacing: .04em; padding-top: 2px; white-space: nowrap;
+  }
+  .cal-title { font-size: clamp(12px, 0.88vw, 13.5px); color: var(--text); line-height: 1.32; font-weight: 500; }
+  .cal-loc { font: 400 10.5px "JetBrains Mono", monospace; color: var(--muted); letter-spacing: .04em; margin-top: 3px; }
+  .cal-item.done .cal-time  { color: var(--dim); }
+  .cal-item.done .cal-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dim); }
+  .cal-item.done .cal-loc   { opacity: 0.5; }
+  .cal-item.now  .cal-time,
+  .cal-item.now  .cal-title { color: var(--amber); }
+  .cal-item.now             { background: rgba(255, 178, 64, 0.06); border-left: 2px solid var(--amber); padding-left: 10px; }
+
+  /* ---------- Inbox / Tasks / Signals items ---------- */
   .ws-item {
     padding: 8px 4px; border-bottom: 1px solid var(--border);
     display: grid; gap: 8px; align-items: start;
@@ -197,6 +194,7 @@
     display: grid; grid-template-columns: auto 1fr auto; gap: 9px;
     cursor: pointer; transition: background .15s;
   }
+  .event:last-child { border-bottom: 0; }
   .event:hover { background: rgba(0, 212, 255, 0.03); }
   .event .ring { width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; box-shadow: 0 0 0 3px currentColor; opacity: 0.7; flex-shrink: 0; }
   .event.r-gulf          .ring { color: var(--cyan); }
@@ -223,7 +221,6 @@
   .corner .k { color: var(--dim); margin-right: 6px; }
   .corner .v { color: var(--cyan); font-weight: 600; }
 
-  /* Zoom controls — below the top-right corner telemetry */
   .zoomctl {
     position: absolute; top: 44px; right: 14px; display: flex; flex-direction: column;
     gap: 4px; z-index: 3; pointer-events: auto;
@@ -238,11 +235,9 @@
   .zoomctl button:hover { border-color: var(--cyan); background: rgba(0, 212, 255, 0.1); }
   .zoomctl button:active { background: rgba(0, 212, 255, 0.18); }
 
-  /* Reticle crosshairs */
   .reticle { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
   .reticle svg { width: 100%; height: 100%; opacity: 0.35; }
 
-  /* Tooltip */
   #tooltip {
     position: fixed; pointer-events: none; z-index: 100;
     background: rgba(10, 18, 32, 0.96); border: 1px solid var(--cyan-dim);
@@ -256,7 +251,6 @@
   #tooltip li { padding: 4px 0; border-top: 1px solid var(--border); color: var(--text); line-height: 1.35; }
   #tooltip li:first-child { border-top: 0; }
 
-  /* SVG map styles */
   .country { fill: rgba(0, 212, 255, 0.06); stroke: rgba(0, 212, 255, 0.22); stroke-width: 0.5; transition: fill .2s; }
   .country:hover { fill: rgba(0, 212, 255, 0.11); }
   .graticule { fill: none; stroke: rgba(0, 212, 255, 0.06); stroke-width: 0.5; }
@@ -273,17 +267,7 @@
   .spot.active .spot-core { r: 5; filter: drop-shadow(0 0 4px currentColor); }
   .spot-label { font: 500 9.5px "JetBrains Mono", monospace; letter-spacing: .08em; fill: var(--muted); pointer-events: none; text-transform: uppercase; }
 
-  /* ---------- Right rail (4 equal rows) ---------- */
-  .right-rail {
-    display: grid; grid-template-rows: repeat(4, minmax(0, 1fr));
-    gap: 10px; min-height: 0;
-  }
-  @media (max-width: 1080px) {
-    .right-rail { grid-template-rows: repeat(4, auto); }
-  }
-  .right-rail .pbody { padding: 8px 12px; }
-
-  /* Weather: 2 cols × 4 rows (7 cells + one empty). Cells share the panel height. */
+  /* ---------- Weather (right rail) ---------- */
   .wx-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 4px; height: 100%; }
   .wx-cell { border: 1px solid var(--border); background: rgba(14, 24, 40, 0.5); padding: clamp(3px, 0.4vw, 7px) clamp(6px, 0.6vw, 9px); border-radius: 2px; display: flex; flex-direction: column; justify-content: center; min-height: 0; overflow: hidden; }
   .wx-cell .c { font: 600 9.5px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -299,7 +283,7 @@
   .mkt-row .chg.down { color: var(--red); }
   .mkt-row .chg.flat { color: var(--dim); }
 
-  /* ---------- Bottom ticker (grid row 4, not fixed) ---------- */
+  /* ---------- Bottom ticker ---------- */
   .bottom-ticker {
     background: rgba(7, 12, 22, 0.95); border-top: 1px solid var(--border);
     overflow: hidden; white-space: nowrap; display: flex; align-items: center;
@@ -316,8 +300,6 @@
   .bt-item .l { color: var(--muted); margin-right: 7px; text-transform: uppercase; font-size: 10px; letter-spacing: .12em; }
   .bt-item .v { color: var(--text); }
   .bt-item .c.up { color: var(--green); } .bt-item .c.down { color: var(--red); } .bt-item .c.flat { color: var(--dim); }
-
-  /* No scrollbars anywhere — fitRender() in the script trims lists to fit. */
 </style>
 </head>
 <body>
@@ -337,31 +319,74 @@
   </div>
 </div>
 
-<div class="schedule">
-  <div class="sch-label">
-    <span class="k">Today · <span id="sch-date">—</span></span>
-    <span class="v">Next: <span id="sch-next" class="hl">—</span></span>
-  </div>
-  <div class="sch-items" id="sch-items"></div>
-  <div class="sch-note" id="sch-note">◈ Sample schedule<br>pending calendar link</div>
-</div>
-
 <div class="main-grid">
 
-  <!-- Left rail: workspace (top) + event feed (bottom) -->
+  <!-- LEFT: personal data (dominant column) -->
   <aside class="left-rail">
 
     <section class="panel">
       <div class="phead">
-        <span>Workspace <span class="unread-badge" id="ws-unread"></span></span>
+        <span>Calendar · <span id="cal-date">—</span></span>
+        <span class="hcode mono" id="cal-next">—</span>
+      </div>
+      <div class="pbody" id="calendar-body"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <span>Inbox <span class="unread-badge" id="inbox-badge"></span></span>
         <span class="hcode mono">SAMPLE</span>
       </div>
-      <div class="pill-row" id="ws-tabs">
-        <button class="pill active" data-tab="inbox">Inbox</button>
-        <button class="pill" data-tab="tasks">Tasks</button>
-        <button class="pill" data-tab="signals">Signals</button>
+      <div class="pbody" id="inbox-body"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <span>Tasks</span>
+        <span class="hcode mono" id="tasks-count">—</span>
       </div>
-      <div class="pbody" id="workspace-body"></div>
+      <div class="pbody" id="tasks-body"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <span>Signals</span>
+        <span class="hcode mono">DIRECT MESSAGES</span>
+      </div>
+      <div class="pbody" id="signals-body"></div>
+    </section>
+
+  </aside>
+
+  <!-- CENTER: map + event feed -->
+  <div class="center-col">
+
+    <section class="panel map-wrap">
+      <div class="phead">
+        <span>Middle East Theater — Event Overlay</span>
+        <span class="hcode mono">PROJ: MERCATOR · 25°E–65°E · 10°N–42°N</span>
+      </div>
+      <div class="pbody">
+        <svg id="map"></svg>
+        <div class="reticle">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line x1="50" y1="0" x2="50" y2="100" stroke="var(--cyan)" stroke-width="0.05" stroke-dasharray="0.3,0.4"/>
+            <line x1="0" y1="50" x2="100" y2="50" stroke="var(--cyan)" stroke-width="0.05" stroke-dasharray="0.3,0.4"/>
+          </svg>
+        </div>
+        <div class="map-corners">
+          <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">MIDDLE EAST</span></div>
+          <div class="corner tr"><span class="k">HOTSPOTS</span><span class="v" id="c-spots">—</span></div>
+          <div class="corner bl"><span class="k">SOURCES ACTIVE</span><span class="v" id="c-src">—</span></div>
+          <div class="corner br"><span class="k">LAST SYNC</span><span class="v mono" id="c-sync">—</span></div>
+        </div>
+        <div class="zoomctl">
+          <button data-zoom="in"    title="Zoom in">+</button>
+          <button data-zoom="out"   title="Zoom out">−</button>
+          <button data-zoom="gulf"  title="Jump to Gulf">G</button>
+          <button data-zoom="reset" title="Reset to Middle East">⟲</button>
+        </div>
+      </div>
     </section>
 
     <section class="panel">
@@ -377,38 +402,9 @@
       <div class="pbody" id="events"></div>
     </section>
 
-  </aside>
+  </div>
 
-  <!-- Map panel -->
-  <section class="panel map-wrap">
-    <div class="phead">
-      <span>Middle East Theater — Event Overlay</span>
-      <span class="hcode mono">PROJ: MERCATOR · 25°E–65°E · 10°N–42°N</span>
-    </div>
-    <div class="pbody">
-      <svg id="map"></svg>
-      <div class="reticle">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-          <line x1="50" y1="0" x2="50" y2="100" stroke="var(--cyan)" stroke-width="0.05" stroke-dasharray="0.3,0.4"/>
-          <line x1="0" y1="50" x2="100" y2="50" stroke="var(--cyan)" stroke-width="0.05" stroke-dasharray="0.3,0.4"/>
-        </svg>
-      </div>
-      <div class="map-corners">
-        <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">MIDDLE EAST</span></div>
-        <div class="corner tr"><span class="k">HOTSPOTS</span><span class="v" id="c-spots">—</span></div>
-        <div class="corner bl"><span class="k">SOURCES ACTIVE</span><span class="v" id="c-src">—</span></div>
-        <div class="corner br"><span class="k">LAST SYNC</span><span class="v mono" id="c-sync">—</span></div>
-      </div>
-      <div class="zoomctl">
-        <button data-zoom="in"    title="Zoom in">+</button>
-        <button data-zoom="out"   title="Zoom out">−</button>
-        <button data-zoom="gulf"  title="Jump to Gulf">G</button>
-        <button data-zoom="reset" title="Reset to Middle East">⟲</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- Right rail: widgets -->
+  <!-- RIGHT: widgets -->
   <aside class="right-rail">
     <section class="panel">
       <div class="phead"><span>GCC Meteorology</span><span class="hcode mono">°C</span></div>
@@ -430,10 +426,8 @@
 
 </div>
 
-<!-- Tooltip -->
 <div id="tooltip"></div>
 
-<!-- Bottom ticker -->
 <div class="bottom-ticker">
   <div class="bt-label">◈ LIVE TAPE</div>
   <div class="bt-track" id="ticker"></div>
@@ -444,15 +438,13 @@ import { loadSnapshot, fmtPct, fmtNum, relTime, errorBanner } from "../shared.js
 
 /* ---------------- Personal data (placeholders) ---------------- */
 // SWAP HERE when integrating Gmail / Google Calendar / Slack / Outlook.
-// Each object is a plain render-input; replace the constant with a fetch that
-// returns the same shape and the UI will pick it up without further changes.
 const PERSONAL = {
   inbox: [
-    { sender: "Amit Jain · Emaar",           subject: "Re: Q3 review and site visit",                         time: "08:42", unread: true  },
-    { sender: "Goldman Sachs MENA",          subject: "Pricing on UAE sovereign tap — draft term sheet",      time: "08:15", unread: true  },
-    { sender: "Fatima Al Hashimi · HR",      subject: "Board pack uploaded — please review before 13:00",     time: "07:55", unread: true  },
-    { sender: "Marie · Assistant",           subject: "Car to DIFC 13:45 · Terminal 3 pickup 15:40",          time: "07:30", unread: false },
-    { sender: "Rashid · CFO",                subject: "Weekly cash position snapshot",                        time: "06:58", unread: false },
+    { sender: "Amit Jain · Emaar",         subject: "Re: Q3 review and site visit",                        time: "08:42", unread: true  },
+    { sender: "Goldman Sachs MENA",        subject: "Pricing on UAE sovereign tap — draft term sheet",     time: "08:15", unread: true  },
+    { sender: "Fatima Al Hashimi · HR",    subject: "Board pack uploaded — please review before 13:00",    time: "07:55", unread: true  },
+    { sender: "Marie · Assistant",         subject: "Car to DIFC 13:45 · Terminal 3 pickup 15:40",         time: "07:30", unread: false },
+    { sender: "Rashid · CFO",              subject: "Weekly cash position snapshot",                       time: "06:58", unread: false },
   ],
   tasks: [
     { title: "Review Aramco partnership term sheet",                  due: "10:00", done: false },
@@ -468,52 +460,15 @@ const PERSONAL = {
   ],
 };
 
-let workspaceTab = "inbox";
-
-function renderWorkspace() {
-  const body = document.getElementById("workspace-body");
-  const { inbox, tasks, signals } = PERSONAL;
-  const unread = inbox.filter(i => i.unread).length;
-  document.getElementById("ws-unread").textContent = unread ? `${unread}` : "";
-
-  let html = "";
-  if (workspaceTab === "inbox") {
-    html = inbox.map(i => `
-      <div class="ws-item ws-inbox">
-        <span class="dot ${i.unread ? 'unread' : 'read'}"></span>
-        <div>
-          <div class="sender">${i.sender}</div>
-          <div class="subj">${i.subject}</div>
-        </div>
-        <span class="ts">${i.time}</span>
-      </div>`).join("");
-  } else if (workspaceTab === "tasks") {
-    html = tasks.map(t => `
-      <div class="ws-item ws-task ${t.done ? 'done' : ''}">
-        <span class="check ${t.done ? 'done' : ''}">${t.done ? '✓' : ''}</span>
-        <div class="title">${t.title}</div>
-        ${t.due ? `<span class="due">◴ ${t.due}</span>` : `<span></span>`}
-      </div>`).join("");
-  } else {
-    html = signals.map(s => `
-      <div class="ws-item ws-signal">
-        <div>
-          <div class="sender">${s.sender}</div>
-          <div class="snip">${s.snippet}</div>
-        </div>
-        <span class="ts">${s.time}</span>
-      </div>`).join("");
-  }
-  fitRender(body, html);
-}
-
-document.getElementById("ws-tabs").addEventListener("click", e => {
-  if (e.target.tagName !== "BUTTON") return;
-  document.querySelectorAll("#ws-tabs button").forEach(b => b.classList.remove("active"));
-  e.target.classList.add("active");
-  workspaceTab = e.target.dataset.tab;
-  renderWorkspace();
-});
+// SWAP HERE when integrating a real calendar feed (Google Calendar / Outlook / CalDAV).
+// Each: { t: "HH:MM" (GST), w: "title", location?: "..." }
+const SCHEDULE = [
+  { t: "07:00", w: "Morning brief",                    location: "Home" },
+  { t: "09:00", w: "Board call — Aramco partnership",  location: "Video · BOD members" },
+  { t: "11:30", w: "Lunch — CEO, Emaar",               location: "Bulgari, Jumeirah Bay" },
+  { t: "14:00", w: "Strategy review — Q3 regional",    location: "HQ · 14th floor" },
+  { t: "16:30", w: "DXB → LHR (EK001)",                location: "Terminal 3" },
+];
 
 /* ---------------- Map hotspots ---------------- */
 const HOTSPOTS = [
@@ -547,9 +502,7 @@ const tip = document.getElementById("tooltip");
 function clsChg(x){ return x > 0 ? "up" : x < 0 ? "down" : "flat"; }
 function arrow(x) { return x > 0 ? "▲" : x < 0 ? "▼" : "■"; }
 
-/* Render a list of items into a container, then trim any children that
- * overflow the container height. Keeps at least one child so an empty-looking
- * panel doesn't happen if a single item is taller than the viewport. */
+/* Renders html into the container, then trims children that don't fit. */
 function fitRender(container, html) {
   container.innerHTML = html;
   requestAnimationFrame(() => {
@@ -567,6 +520,86 @@ function fitRender(container, html) {
   });
 }
 
+/* ---------------- Calendar ---------------- */
+function renderCalendar() {
+  const nowUtc = new Date();
+  const nowGst = new Date(nowUtc.getTime() + 4 * 3600 * 1000);
+  const nowMin = nowGst.getUTCHours() * 60 + nowGst.getUTCMinutes();
+
+  let nextItem = null, nextDelta = Infinity;
+  const html = SCHEDULE.map(it => {
+    const [hh, mm] = it.t.split(":").map(Number);
+    const min = hh * 60 + mm;
+    let klass = "cal-item";
+    if (min + 30 < nowMin)                            klass += " done";
+    else if (min <= nowMin && min + 30 >= nowMin)     klass += " now";
+    else {
+      klass += " upcoming";
+      if (min - nowMin < nextDelta) { nextDelta = min - nowMin; nextItem = it; }
+    }
+    return `
+      <div class="${klass}">
+        <div class="cal-time">${it.t}</div>
+        <div>
+          <div class="cal-title">${it.w}</div>
+          ${it.location ? `<div class="cal-loc">${it.location}</div>` : ""}
+        </div>
+      </div>`;
+  }).join("");
+  fitRender(document.getElementById("calendar-body"), html);
+
+  const dt = new Intl.DateTimeFormat(undefined, { timeZone: "Asia/Dubai", weekday: "short", day: "numeric", month: "short" }).format(new Date());
+  document.getElementById("cal-date").textContent = dt;
+  const nextLabel = document.getElementById("cal-next");
+  if (nextItem) {
+    const inStr = nextDelta >= 60 ? `${Math.floor(nextDelta/60)}h ${nextDelta%60}m` : `${nextDelta}m`;
+    nextLabel.textContent = `NEXT IN ${inStr}`;
+  } else {
+    nextLabel.textContent = "DAY CLEAR";
+  }
+}
+
+/* ---------------- Inbox / Tasks / Signals ---------------- */
+function renderInbox() {
+  const html = PERSONAL.inbox.map(i => `
+    <div class="ws-item ws-inbox">
+      <span class="dot ${i.unread ? 'unread' : 'read'}"></span>
+      <div>
+        <div class="sender">${i.sender}</div>
+        <div class="subj">${i.subject}</div>
+      </div>
+      <span class="ts">${i.time}</span>
+    </div>`).join("");
+  fitRender(document.getElementById("inbox-body"), html);
+  const unread = PERSONAL.inbox.filter(i => i.unread).length;
+  document.getElementById("inbox-badge").textContent = unread ? `${unread}` : "";
+}
+
+function renderTasks() {
+  const open = PERSONAL.tasks.filter(t => !t.done).length;
+  const html = PERSONAL.tasks.map(t => `
+    <div class="ws-item ws-task ${t.done ? 'done' : ''}">
+      <span class="check ${t.done ? 'done' : ''}">${t.done ? '✓' : ''}</span>
+      <div class="title">${t.title}</div>
+      ${t.due ? `<span class="due">◴ ${t.due}</span>` : `<span></span>`}
+    </div>`).join("");
+  fitRender(document.getElementById("tasks-body"), html);
+  document.getElementById("tasks-count").textContent = `${open} OPEN`;
+}
+
+function renderSignals() {
+  const html = PERSONAL.signals.map(s => `
+    <div class="ws-item ws-signal">
+      <div>
+        <div class="sender">${s.sender}</div>
+        <div class="snip">${s.snippet}</div>
+      </div>
+      <span class="ts">${s.time}</span>
+    </div>`).join("");
+  fitRender(document.getElementById("signals-body"), html);
+}
+
+/* ---------------- Map ---------------- */
 let MAP = null;
 
 async function renderMap(articles) {
@@ -574,7 +607,7 @@ async function renderMap(articles) {
   const pbody = document.querySelector(".map-wrap .pbody");
   const w = pbody.clientWidth;
   const h = pbody.clientHeight;
-  if (w < 10 || h < 10) return;       // guard during layout thrash
+  if (w < 10 || h < 10) return;
   svg.attr("viewBox", `0 0 ${w} ${h}`).attr("width", w).attr("height", h);
   svg.selectAll("*").remove();
 
@@ -640,8 +673,6 @@ async function renderMap(articles) {
   svg.call(zoom);
   svg.on("dblclick.zoom", null);
 
-  // Projection already fits ME_BBOX, so identity = the Middle East view.
-  // Gulf is computed as a quick-zoom target for the "G" button.
   const initial = d3.zoomIdentity;
   const gulfTransform = (() => {
     const [[x0, y0], [x1, y1]] = path.bounds(GULF_BBOX);
@@ -651,9 +682,6 @@ async function renderMap(articles) {
     return d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(k);
   })();
   svg.call(zoom.transform, initial);
-  // Belt-and-suspenders: directly apply the transform in case the synthetic
-  // zoom event is deferred in some browser paths. Keeps the initial render
-  // deterministic regardless of event timing.
   mapLayer.attr("transform", initial.toString());
   positionSpots(initial);
   document.getElementById("c-view").textContent = `${initial.k.toFixed(1)}× · ${describeView(initial, projection, w, h)}`;
@@ -758,45 +786,6 @@ function renderTicker(all) {
   document.getElementById("ticker").innerHTML = html + html;
 }
 
-/* ---------------- Schedule strip ---------------- */
-// SWAP HERE when integrating a real calendar feed (Google Calendar / Outlook).
-const SCHEDULE = [
-  { t: "07:00", w: "Morning brief",                   location: "Home" },
-  { t: "09:00", w: "Board call — Aramco partnership", location: "Video" },
-  { t: "11:30", w: "Lunch — CEO, Emaar",              location: "Bulgari, Jumeirah Bay" },
-  { t: "14:00", w: "Strategy review — Q3 regional",   location: "HQ" },
-  { t: "16:30", w: "DXB → LHR (EK001)",               location: "Terminal 3" },
-];
-
-function renderSchedule() {
-  const nowUtc = new Date();
-  const nowGst = new Date(nowUtc.getTime() + 4 * 3600 * 1000);
-  const nowMin = nowGst.getUTCHours() * 60 + nowGst.getUTCMinutes();
-
-  let nextItem = null, nextDelta = Infinity;
-  const html = SCHEDULE.map(it => {
-    const [hh, mm] = it.t.split(":").map(Number);
-    const min = hh * 60 + mm;
-    let klass = "sch-item";
-    if (min + 30 < nowMin) klass += " done";
-    else if (min <= nowMin && min + 30 >= nowMin) klass += " now";
-    else if (min - nowMin < nextDelta) { nextDelta = min - nowMin; nextItem = it; }
-    return `<div class="${klass}"><span class="t">${it.t}</span><span class="sep">·</span><span class="w">${it.w}</span></div>`;
-  }).join("");
-  document.getElementById("sch-items").innerHTML = html;
-
-  const dt = new Intl.DateTimeFormat(undefined, { timeZone: "Asia/Dubai", weekday: "short", day: "numeric", month: "short" }).format(new Date());
-  document.getElementById("sch-date").textContent = dt;
-  if (nextItem) {
-    const inStr = nextDelta >= 60 ? `${Math.floor(nextDelta/60)}h ${nextDelta%60}m` : `${nextDelta}m`;
-    document.getElementById("sch-next").textContent = `${nextItem.t} · ${nextItem.w}  (in ${inStr})`;
-  } else {
-    document.getElementById("sch-next").textContent = "Day clear";
-  }
-}
-renderSchedule();
-setInterval(renderSchedule, 60000);
-
 /* ---------------- Clock + boot ---------------- */
 function tickClock() {
   const d = new Date();
@@ -806,9 +795,13 @@ function tickClock() {
 }
 setInterval(tickClock, 1000); tickClock();
 
+// Personal sections render immediately (no backend needed).
+renderCalendar(); renderInbox(); renderTasks(); renderSignals();
+// Recompute calendar states every minute so "now" / "next in Xh Ym" stays accurate.
+setInterval(renderCalendar, 60000);
+
 async function boot() {
   try {
-    renderWorkspace();
     STATE = await loadSnapshot();
     document.getElementById("c-src").textContent = "22";
     document.getElementById("c-sync").textContent = new Date(STATE.generated_at).toISOString().slice(11,19) + "Z";
@@ -826,13 +819,12 @@ async function boot() {
 }
 boot();
 
-// On viewport change: re-fit the map AND re-trim every list so the new
-// panel heights are honored. Debounced so fast drags don't thrash d3.
+/* On resize: re-fit every list and the map (debounced). */
 let resizeT = null;
 window.addEventListener("resize", () => {
   clearTimeout(resizeT);
   resizeT = setTimeout(() => {
-    renderWorkspace();
+    renderCalendar(); renderInbox(); renderTasks(); renderSignals();
     if (!STATE) return;
     renderEvents();
     mktRows("commodities", STATE.markets.commodity);
@@ -842,7 +834,7 @@ window.addEventListener("resize", () => {
   }, 150);
 });
 
-// Refresh dynamic widgets every 60s so the tape feels alive without reloads.
+/* Poll backend every 60s for fresh news + markets + weather. */
 setInterval(async () => {
   try {
     STATE = await loadSnapshot();
