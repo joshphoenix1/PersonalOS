@@ -100,6 +100,68 @@ sudo certbot --nginx -d yourdomain.com
 
 Then update `server_name` in `deploy/nginx.conf` to match the domain.
 
+## 11. Cloudflare Tunnel (for os.joshphoenix.com)
+
+Cloudflare Tunnel exposes the EC2 origin to the public internet without opening
+inbound ports. TLS is terminated at the Cloudflare edge — nginx-level certbot
+is not needed if the tunnel is in front.
+
+### 11a. Install cloudflared on Ubuntu
+
+```bash
+curl -L -o /tmp/cloudflared.deb \
+  https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i /tmp/cloudflared.deb
+cloudflared --version
+```
+
+### 11b. Get the connector token
+
+In the Cloudflare Zero Trust dashboard:
+- **Networks → Tunnels →** your tunnel **→ Configure → Connectors → Install connector**
+- Pick **Debian / Ubuntu 64-bit**
+- Copy the `cloudflared service install <TOKEN>` line — the TOKEN is a long
+  base64/JWT string starting with `eyJ...`.
+
+Under **Public Hostname** of the same tunnel, add:
+- **Subdomain:** `os`  ·  **Domain:** `joshphoenix.com`
+- **Service:** `HTTP`  ·  **URL:** `localhost:8000`
+
+### 11c. Install the service (token stays outside git)
+
+```bash
+# Paste the install command the dashboard gave you. The TOKEN ends up in
+# /etc/systemd/system/cloudflared.service and is NEVER in this repo.
+sudo cloudflared service install <TOKEN>
+sudo systemctl enable --now cloudflared
+sudo systemctl status cloudflared --no-pager
+```
+
+Verify the tunnel is up:
+
+```bash
+sudo journalctl -u cloudflared -f    # should see "Registered tunnel connection" 4×
+curl -sI https://os.joshphoenix.com/api/health   # expect HTTP/2 200
+```
+
+### 11d. CORS / nginx interaction
+
+Nginx is no longer strictly required with the tunnel in front — cloudflared
+talks directly to `localhost:8000`. Either:
+- Keep nginx for future same-origin static serving (tunnel → nginx → uvicorn), or
+- Point cloudflared directly at the uvicorn port and disable the nginx site.
+
+The API sets `Access-Control-Allow-Origin: *` already, so cross-origin calls
+from Cloudflare Pages (if you later move the frontend there) also work.
+
+### 11e. Rotating or replacing the token
+
+```bash
+sudo cloudflared service uninstall
+sudo cloudflared service install <NEW_TOKEN>
+sudo systemctl enable --now cloudflared
+```
+
 ## Operational notes
 
 - **Logs:** `journalctl -u newsagg -f` for app, `/var/log/nginx/newsagg.*.log` for http.
