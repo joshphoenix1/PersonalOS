@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Intel Ops — News Aggregator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<style>
+  :root {
+    --bg:        #04070C;
+    --bg-2:      #070C16;
+    --panel:     #0A1220;
+    --panel-2:   #0E1828;
+    --border:    #162338;
+    --border-2:  #25395A;
+    --grid:      rgba(0, 212, 255, 0.04);
+    --text:      #E6EDF7;
+    --muted:     #6B7A93;
+    --dim:       #3F4A60;
+    --cyan:      #00D4FF;
+    --cyan-dim:  rgba(0, 212, 255, 0.35);
+    --amber:     #FFB240;
+    --red:       #FF4F6D;
+    --green:     #2DE88F;
+    --magenta:   #E667FF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+  body {
+    font-family: "Inter", system-ui, sans-serif; font-size: 12.5px; line-height: 1.4;
+    background:
+      radial-gradient(1600px 800px at 70% 10%, rgba(0, 212, 255, 0.045), transparent 60%),
+      radial-gradient(900px 500px at 10% 90%, rgba(230, 103, 255, 0.04), transparent 60%),
+      var(--bg);
+  }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .display { font-family: "Orbitron", "JetBrains Mono", monospace; letter-spacing: 0.12em; }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    height: 44px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(10, 18, 32, 0.95), rgba(10, 18, 32, 0.85));
+    backdrop-filter: blur(8px);
+  }
+  .tb-left, .tb-right { display: flex; align-items: center; gap: 22px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .chev { color: var(--cyan); font-family: "Orbitron"; font-weight: 700; letter-spacing: .18em; font-size: 13px; }
+  .brand .sep { color: var(--dim); font-size: 11px; }
+  .brand .sub { color: var(--muted); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+  .sysind { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .sysind .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(45, 232, 143, 0.15); animation: pulse-dot 1.8s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .clock { color: var(--cyan); font-size: 12.5px; font-weight: 500; }
+  .choose { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .choose:hover { color: var(--cyan); }
+
+  /* ---------- Schedule strip ---------- */
+  .schedule {
+    display: grid; grid-template-columns: 220px 1fr auto;
+    height: 56px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(10, 18, 32, 0.75), rgba(10, 18, 32, 0.55));
+  }
+  .schedule .sch-label {
+    display: flex; flex-direction: column; justify-content: center; padding: 0 18px;
+    border-right: 1px solid var(--border); background: rgba(0, 212, 255, 0.04);
+  }
+  .schedule .sch-label .k { font: 600 10px "JetBrains Mono", monospace; letter-spacing: .18em; color: var(--cyan); text-transform: uppercase; }
+  .schedule .sch-label .v { font: 500 12.5px "JetBrains Mono", monospace; color: var(--text); margin-top: 2px; }
+  .schedule .sch-label .v .hl { color: var(--amber); }
+  .schedule .sch-items {
+    display: flex; align-items: center; gap: 22px; padding: 0 20px; overflow-x: auto;
+    font-size: 12px;
+  }
+  .schedule .sch-item { display: flex; gap: 10px; align-items: baseline; white-space: nowrap; }
+  .schedule .sch-item .t { font: 600 11px "JetBrains Mono", monospace; color: var(--cyan); letter-spacing: .04em; }
+  .schedule .sch-item .sep { color: var(--dim); }
+  .schedule .sch-item .w { color: var(--text); }
+  .schedule .sch-item.done .t { color: var(--dim); }
+  .schedule .sch-item.done .w { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dim); }
+  .schedule .sch-item.now  .t { color: var(--amber); }
+  .schedule .sch-item.now  .w { color: var(--amber); }
+  .schedule .sch-note {
+    display: flex; align-items: center; padding: 0 18px; border-left: 1px solid var(--border);
+    font: 500 9.5px "JetBrains Mono", monospace; letter-spacing: .15em; color: var(--muted);
+    text-transform: uppercase; max-width: 220px; text-align: right;
+  }
+
+  /* ---------- Main layout ---------- */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 310px 1fr 340px;
+    grid-template-rows: calc(100vh - 44px - 56px - 34px);
+    gap: 10px; padding: 10px;
+  }
+  @media (max-width: 1280px) { .main-grid { grid-template-columns: 280px 1fr 300px; } }
+  @media (max-width: 1080px) { .main-grid { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; } html, body { overflow: auto; } }
+
+  /* Panels */
+  .panel {
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--border); border-radius: 4px;
+    position: relative; overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(0, 212, 255, 0.04);
+  }
+  .panel::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background:
+      linear-gradient(rgba(0, 212, 255, 0.015) 1px, transparent 1px) 0 0 / 100% 28px,
+      linear-gradient(90deg, rgba(0, 212, 255, 0.015) 1px, transparent 1px) 0 0 / 28px 100%;
+  }
+  .panel .phead {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--cyan);
+    background: rgba(0, 212, 255, 0.02);
+    position: relative; z-index: 1;
+  }
+  .panel .phead .hcode { color: var(--muted); font-size: 10px; }
+  .panel .pbody { padding: 10px 14px; position: relative; z-index: 1; overflow-y: auto; max-height: calc(100vh - 140px); }
+
+  /* ---------- Left rail: events ---------- */
+  .left-rail { display: flex; flex-direction: column; min-height: 0; }
+  .left-rail .pbody { flex: 1; min-height: 0; padding: 6px 10px; max-height: none; }
+  .region-pill-row { display: flex; gap: 4px; flex-wrap: wrap; padding: 10px 10px 6px; border-bottom: 1px dashed var(--border); }
+  .region-pill { font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--border-2); border-radius: 3px; color: var(--muted); cursor: pointer; background: transparent; }
+  .region-pill:hover { color: var(--text); border-color: var(--cyan-dim); }
+  .region-pill.active { color: var(--cyan); border-color: var(--cyan); background: rgba(0, 212, 255, 0.07); }
+
+  .event {
+    padding: 10px 2px; border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: auto 1fr auto; gap: 9px;
+    cursor: pointer; transition: background .15s;
+  }
+  .event:hover { background: rgba(0, 212, 255, 0.03); }
+  .event .ring { width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; box-shadow: 0 0 0 3px currentColor; opacity: 0.7; }
+  .event.r-gulf        .ring { color: var(--cyan); }
+  .event.r-iran_war    .ring { color: var(--amber); }
+  .event.r-oil_markets .ring { color: var(--magenta); }
+  .event.r-markets_macro .ring { color: var(--green); }
+  .event.r-global      .ring { color: var(--dim); }
+  .event .body { min-width: 0; }
+  .event .src { font: 600 9.5px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .event h4 { font-size: 12.5px; font-weight: 500; line-height: 1.32; color: var(--text); }
+  .event .ts { color: var(--dim); font: 10.5px "JetBrains Mono", monospace; white-space: nowrap; align-self: flex-start; margin-top: 3px; }
+
+  /* ---------- Map panel ---------- */
+  .map-wrap { position: relative; display: flex; flex-direction: column; }
+  .map-wrap .pbody { flex: 1; padding: 0; max-height: none; position: relative; }
+  #map { width: 100%; height: 100%; display: block; }
+  .map-corners { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+  .corner { position: absolute; font: 500 10px/1.3 "JetBrains Mono", monospace; letter-spacing: .1em; color: var(--muted); }
+  .corner.tl { top: 12px; left: 14px; }
+  .corner.tr { top: 12px; right: 14px; text-align: right; }
+  .corner.bl { bottom: 12px; left: 14px; }
+  .corner.br { bottom: 12px; right: 14px; text-align: right; }
+  .corner .k { color: var(--dim); margin-right: 6px; }
+  .corner .v { color: var(--cyan); font-weight: 600; }
+
+  /* Reticle crosshairs */
+  .reticle { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+  .reticle svg { width: 100%; height: 100%; opacity: 0.35; }
+
+  /* Tooltip */
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    background: rgba(10, 18, 32, 0.96); border: 1px solid var(--cyan-dim);
+    padding: 9px 12px; border-radius: 3px; min-width: 200px; max-width: 320px;
+    font-size: 11.5px; display: none;
+    box-shadow: 0 4px 24px rgba(0, 212, 255, 0.1);
+  }
+  #tooltip .ttl { font: 600 10.5px/1 "JetBrains Mono", monospace; letter-spacing: .15em; text-transform: uppercase; color: var(--cyan); margin-bottom: 6px; }
+  #tooltip .cnt { color: var(--muted); margin-bottom: 8px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+  #tooltip ul { list-style: none; }
+  #tooltip li { padding: 4px 0; border-top: 1px solid var(--border); color: var(--text); line-height: 1.35; }
+  #tooltip li:first-child { border-top: 0; }
+
+  /* SVG map styles */
+  .country { fill: rgba(0, 212, 255, 0.06); stroke: rgba(0, 212, 255, 0.22); stroke-width: 0.5; transition: fill .2s; }
+  .country:hover { fill: rgba(0, 212, 255, 0.11); }
+  .graticule { fill: none; stroke: rgba(0, 212, 255, 0.06); stroke-width: 0.5; }
+  .outline   { fill: none; stroke: rgba(0, 212, 255, 0.15); stroke-width: 0.75; }
+  .spot      { cursor: pointer; }
+  .spot-pulse { fill: none; stroke-width: 1.2; opacity: 0; animation: ring 2.6s ease-out infinite; }
+  .spot-core  { stroke-width: 1.2; }
+  @keyframes ring { 0% { r: 4; opacity: 0.9; } 100% { r: 22; opacity: 0; } }
+  .spot.r-gulf        .spot-pulse, .spot.r-gulf        .spot-core { stroke: var(--cyan);   fill: var(--cyan); }
+  .spot.r-iran_war    .spot-pulse, .spot.r-iran_war    .spot-core { stroke: var(--amber);  fill: var(--amber); }
+  .spot.r-oil_markets .spot-pulse, .spot.r-oil_markets .spot-core { stroke: var(--magenta); fill: var(--magenta); }
+  .spot.r-markets_macro .spot-pulse, .spot.r-markets_macro .spot-core { stroke: var(--green); fill: var(--green); }
+  .spot.r-global      .spot-pulse, .spot.r-global      .spot-core { stroke: #9AB1CC; fill: #9AB1CC; }
+  .spot.active .spot-core { r: 5; filter: drop-shadow(0 0 4px currentColor); }
+  .spot-label { font: 500 9.5px "JetBrains Mono", monospace; letter-spacing: .08em; fill: var(--muted); pointer-events: none; text-transform: uppercase; }
+
+  /* ---------- Right rail ---------- */
+  .right-rail { display: grid; grid-template-rows: auto auto auto auto; gap: 10px; min-height: 0; }
+  .right-rail .panel { display: flex; flex-direction: column; min-height: 0; }
+  .right-rail .pbody { max-height: none; padding: 10px 12px; }
+
+  .wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .wx-cell { border: 1px solid var(--border); background: rgba(14, 24, 40, 0.5); padding: 7px 9px; border-radius: 2px; }
+  .wx-cell .c { font: 600 10px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .wx-cell .t { font-family: "JetBrains Mono", monospace; font-size: 18px; font-weight: 500; color: var(--text); margin-top: 2px; }
+  .wx-cell .sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+  .mkt-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: 11.5px; }
+  .mkt-row:last-child { border-bottom: 0; }
+  .mkt-row .lbl { color: var(--muted); font: 600 10.5px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
+  .mkt-row .val { font-family: "JetBrains Mono", monospace; font-weight: 500; color: var(--text); }
+  .mkt-row .chg { font-family: "JetBrains Mono", monospace; font-size: 10.5px; min-width: 60px; text-align: right; }
+  .mkt-row .chg.up   { color: var(--green); }
+  .mkt-row .chg.down { color: var(--red); }
+  .mkt-row .chg.flat { color: var(--dim); }
+
+  /* ---------- Bottom ticker ---------- */
+  .bottom-ticker {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 34px;
+    background: rgba(7, 12, 22, 0.95); border-top: 1px solid var(--border);
+    overflow: hidden; white-space: nowrap; display: flex; align-items: center;
+  }
+  .bt-label {
+    padding: 0 14px; height: 100%; display: flex; align-items: center;
+    background: rgba(0, 212, 255, 0.08); border-right: 1px solid var(--cyan-dim);
+    font: 600 10px "JetBrains Mono", monospace; letter-spacing: .18em;
+    color: var(--cyan); text-transform: uppercase; flex-shrink: 0;
+  }
+  .bt-track { display: inline-flex; gap: 32px; animation: scroll 100s linear infinite; padding-left: 100%; }
+  @keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+  .bt-item { font: 500 11.5px "JetBrains Mono", monospace; letter-spacing: .02em; }
+  .bt-item .l { color: var(--muted); margin-right: 7px; text-transform: uppercase; font-size: 10px; letter-spacing: .12em; }
+  .bt-item .v { color: var(--text); }
+  .bt-item .c.up { color: var(--green); } .bt-item .c.down { color: var(--red); } .bt-item .c.flat { color: var(--dim); }
+
+  /* Scrollbars */
+  .pbody::-webkit-scrollbar { width: 6px; }
+  .pbody::-webkit-scrollbar-track { background: transparent; }
+  .pbody::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-left">
+    <div class="brand">
+      <span class="chev display">◣ GULF COMMAND</span>
+      <span class="sep">│</span>
+      <span class="sub">Executive Intelligence Brief</span>
+    </div>
+  </div>
+  <div class="tb-right">
+    <div class="sysind"><span class="dot"></span><span>SYSTEMS NOMINAL</span></div>
+    <div class="mono clock" id="clock">—</div>
+    <a class="choose" href="../">◀ OTHER DESIGNS</a>
+  </div>
+</div>
+
+<div class="schedule">
+  <div class="sch-label">
+    <span class="k">Today · <span id="sch-date">—</span></span>
+    <span class="v">Next: <span id="sch-next" class="hl">—</span></span>
+  </div>
+  <div class="sch-items" id="sch-items"></div>
+  <div class="sch-note" id="sch-note">◈ Sample schedule<br>pending calendar link</div>
+</div>
+
+<div class="main-grid">
+
+  <!-- Left rail: event feed -->
+  <section class="panel left-rail">
+    <div class="phead"><span>Event Feed</span><span class="hcode mono" id="event-count">—</span></div>
+    <div class="region-pill-row" id="region-pills">
+      <button class="region-pill active" data-r="">ALL</button>
+      <button class="region-pill" data-r="gulf">Gulf</button>
+      <button class="region-pill" data-r="iran_war">Iran/War</button>
+      <button class="region-pill" data-r="oil_markets">Oil</button>
+      <button class="region-pill" data-r="markets_macro">Macro</button>
+      <button class="region-pill" data-r="global">Global</button>
+    </div>
+    <div class="pbody" id="events"></div>
+  </section>
+
+  <!-- Map panel -->
+  <section class="panel map-wrap">
+    <div class="phead">
+      <span>Middle East Theater — Event Overlay</span>
+      <span class="hcode mono">PROJ: MERCATOR · 25°E–65°E · 10°N–42°N</span>
+    </div>
+    <div class="pbody">
+      <svg id="map"></svg>
+      <div class="reticle">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+          <line x1="50" y1="0" x2="50" y2="100" stroke="var(--cyan)" stroke-width="0.05" stroke-dasharray="0.3,0.4"/>
+          <line x1="0" y1="50" x2="100" y2="50" stroke="var(--cyan)" stroke-width="0.05" stroke-dasharray="0.3,0.4"/>
+        </svg>
+      </div>
+      <div class="map-corners">
+        <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">MIDDLE EAST</span></div>
+        <div class="corner tr"><span class="k">HOTSPOTS</span><span class="v" id="c-spots">—</span></div>
+        <div class="corner bl"><span class="k">SOURCES ACTIVE</span><span class="v" id="c-src">—</span></div>
+        <div class="corner br"><span class="k">LAST SYNC</span><span class="v mono" id="c-sync">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Right rail: widgets -->
+  <aside class="right-rail">
+    <section class="panel">
+      <div class="phead"><span>GCC Meteorology</span><span class="hcode mono">°C</span></div>
+      <div class="pbody"><div class="wx-grid" id="wx"></div></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><span>Commodities</span><span class="hcode mono" id="comm-chg">—</span></div>
+      <div class="pbody" id="commodities"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><span>Indices</span><span class="hcode mono" id="idx-chg">—</span></div>
+      <div class="pbody" id="indices"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><span>Currency — USD Basket</span><span class="hcode mono">FIXINGS</span></div>
+      <div class="pbody" id="fx"></div>
+    </section>
+  </aside>
+
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip"></div>
+
+<!-- Bottom ticker -->
+<div class="bottom-ticker">
+  <div class="bt-label">◈ LIVE TAPE</div>
+  <div class="bt-track" id="ticker"></div>
+</div>
+
+<script type="module">
+import { loadSnapshot, fmtPct, fmtNum, relTime, errorBanner } from "../shared.js";
+
+// Map is zoomed to the Middle East. Hotspots here are all ME-local so they
+// show as pulses on-map; broader-region news still flows through the sidebar
+// and filter pills, just without a spatial pin.
+const HOTSPOTS = [
+  { key: "dubai",     name: "Dubai",     lat: 25.20, lon: 55.27, region: "gulf",     match: t => /dubai|uae|emirates|abu dhabi|dp world|emaar|etihad/i.test(t) },
+  { key: "riyadh",    name: "Riyadh",    lat: 24.71, lon: 46.68, region: "gulf",     match: t => /saudi|riyadh|aramco|neom|pif|public investment fund|jeddah/i.test(t) },
+  { key: "doha",      name: "Doha",      lat: 25.29, lon: 51.53, region: "gulf",     match: t => /qatar|doha/i.test(t) },
+  { key: "kuwait",    name: "Kuwait",    lat: 29.38, lon: 47.98, region: "gulf",     match: t => /kuwait/i.test(t) },
+  { key: "manama",    name: "Manama",    lat: 26.23, lon: 50.59, region: "gulf",     match: t => /bahrain|manama/i.test(t) },
+  { key: "muscat",    name: "Muscat",    lat: 23.59, lon: 58.38, region: "gulf",     match: t => /oman|muscat/i.test(t) },
+  { key: "tehran",    name: "Tehran",    lat: 35.68, lon: 51.39, region: "iran_war", match: t => /iran|tehran|irgc|khamenei/i.test(t) },
+  { key: "jerusalem", name: "Jerusalem", lat: 31.78, lon: 35.22, region: "iran_war", match: t => /israel|gaza|hezbollah|netanyahu|tel aviv|west bank/i.test(t) },
+  { key: "hormuz",    name: "Hormuz",    lat: 26.57, lon: 56.25, region: "iran_war", match: t => /hormuz|strait of hormuz|tanker seiz/i.test(t) },
+  { key: "sanaa",     name: "Sanaa",     lat: 15.37, lon: 44.19, region: "iran_war", match: t => /yemen|houthi|sanaa|red sea/i.test(t) },
+  { key: "baghdad",   name: "Baghdad",   lat: 33.31, lon: 44.36, region: "iran_war", match: t => /iraq|baghdad/i.test(t) },
+  { key: "damascus",  name: "Damascus",  lat: 33.51, lon: 36.28, region: "iran_war", match: t => /syria|damascus|lebanon|beirut/i.test(t) },
+  { key: "cairo",     name: "Cairo",     lat: 30.04, lon: 31.23, region: "global",   match: t => /egypt|cairo|suez/i.test(t) },
+];
+
+// Bounding box the map zooms to (roughly: Egypt/Libya → Iran/Pakistan, Caucasus → Yemen).
+const ME_BBOX = {
+  type: "Feature",
+  geometry: { type: "Polygon", coordinates: [[[25, 10], [65, 10], [65, 42], [25, 42], [25, 10]]] }
+};
+
+let STATE = null;
+const tip = document.getElementById("tooltip");
+
+function clsChg(x){ return x > 0 ? "up" : x < 0 ? "down" : "flat"; }
+function arrow(x) { return x > 0 ? "▲" : x < 0 ? "▼" : "■"; }
+
+/* ---------------- Map ---------------- */
+async function renderMap(articles) {
+  const svg = d3.select("#map");
+  const pbody = document.querySelector(".map-wrap .pbody");
+  const w = pbody.clientWidth;
+  const h = pbody.clientHeight;
+  svg.attr("viewBox", `0 0 ${w} ${h}`).attr("width", w).attr("height", h);
+  svg.selectAll("*").remove();
+
+  // Higher-res 50m atlas gives cleaner country outlines at Middle-East zoom.
+  const topology = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json").then(r => r.json());
+  const land = topojson.feature(topology, topology.objects.countries);
+  const borders = topojson.mesh(topology, topology.objects.countries, (a, b) => a !== b);
+
+  // Fit projection to the ME bounding box, with a small inset.
+  const projection = d3.geoMercator().fitExtent([[12, 12], [w - 12, h - 12]], ME_BBOX);
+  const path = d3.geoPath(projection);
+
+  // Clip everything to the viewport so countries that extend past the bbox
+  // (Pakistan, India, Libya, Turkey, etc.) crop cleanly at the panel edge.
+  svg.append("defs").append("clipPath").attr("id", "mapclip")
+    .append("rect").attr("x", 0).attr("y", 0).attr("width", w).attr("height", h);
+  const g = svg.append("g").attr("clip-path", "url(#mapclip)");
+
+  // Graticule — 5° step suits a regional zoom.
+  const graticule = d3.geoGraticule().step([5, 5]);
+  g.append("path").attr("class", "graticule").attr("d", path(graticule()));
+
+  // Country fills + country borders (more visible than a single mesh outline).
+  g.append("g").selectAll("path").data(land.features)
+    .join("path").attr("class", "country").attr("d", path);
+  g.append("path").attr("class", "outline").attr("d", path(borders));
+
+  // Count articles per hotspot
+  const counts = {};
+  const topByHotspot = {};
+  for (const h of HOTSPOTS) {
+    counts[h.key] = 0;
+    topByHotspot[h.key] = [];
+  }
+  for (const a of articles) {
+    for (const h of HOTSPOTS) {
+      if (h.match(a.title + " " + (a.summary||""))) {
+        counts[h.key]++;
+        if (topByHotspot[h.key].length < 3) topByHotspot[h.key].push(a);
+      }
+    }
+  }
+
+  const spots = g.append("g");
+  for (const h of HOTSPOTS) {
+    const [cx, cy] = projection([h.lon, h.lat]);
+    const n = counts[h.key];
+    if (!Number.isFinite(cx)) continue;
+    const group = spots.append("g")
+      .attr("class", `spot r-${h.region}`)
+      .attr("transform", `translate(${cx},${cy})`)
+      .on("mousemove", (ev) => showTip(ev, h, topByHotspot[h.key], n))
+      .on("mouseleave", hideTip);
+    group.append("circle").attr("class", "spot-pulse").attr("r", 4);
+    group.append("circle").attr("class", "spot-pulse").attr("r", 4).style("animation-delay", "1.3s");
+    const core = Math.max(2.6, Math.min(6, 2.8 + Math.log(1 + n) * 1.0));
+    group.append("circle").attr("class", "spot-core").attr("r", core).attr("opacity", n > 0 ? 1 : 0.4);
+    // All hotspots get a label now that the map is regional and there's room.
+    group.append("text").attr("class", "spot-label").attr("x", core + 5).attr("y", 3).text(h.name.toUpperCase());
+  }
+
+  // Update corners
+  const active = HOTSPOTS.filter(h => counts[h.key] > 0).length;
+  document.getElementById("c-spots").textContent = `${active}/${HOTSPOTS.length}`;
+}
+
+function showTip(ev, h, items, n) {
+  tip.style.display = "block";
+  tip.innerHTML = `
+    <div class="ttl">${h.name} · ${h.region.replace("_"," ")}</div>
+    <div class="cnt">${n} active ${n === 1 ? "story" : "stories"}</div>
+    ${items.length ? `<ul>${items.map(a => `<li>${a.title}</li>`).join("")}</ul>` : ""}`;
+  positionTip(ev);
+}
+function positionTip(ev) {
+  const pad = 12;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  const r = tip.getBoundingClientRect();
+  if (x + r.width + pad > window.innerWidth)  x = ev.clientX - r.width - pad;
+  if (y + r.height + pad > window.innerHeight) y = ev.clientY - r.height - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+
+/* ---------------- Event feed ---------------- */
+let currentRegion = "";
+function renderEvents() {
+  const items = (STATE.major_news || []).concat(STATE.minor_news || []);
+  const filtered = currentRegion ? items.filter(x => x.region === currentRegion) : items;
+  document.getElementById("event-count").textContent = `${filtered.length} events`;
+  document.getElementById("events").innerHTML = filtered.slice(0, 40).map(a => `
+    <a class="event r-${a.region}" href="${a.url}" target="_blank" rel="noopener">
+      <span class="ring"></span>
+      <div class="body">
+        <div class="src">${a.source}</div>
+        <h4>${a.title}</h4>
+      </div>
+      <span class="ts">${relTime(a.published_at || a.fetched_at)}</span>
+    </a>`).join("");
+}
+document.getElementById("region-pills").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll(".region-pill").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  currentRegion = e.target.dataset.r;
+  renderEvents();
+});
+
+/* ---------------- Widgets ---------------- */
+function renderWx(cities) {
+  document.getElementById("wx").innerHTML = cities.map(c => `
+    <div class="wx-cell">
+      <div class="c">${c.city}</div>
+      <div class="t">${c.temp_c?.toFixed(0) ?? "—"}°</div>
+      <div class="sub">${c.summary || "—"} · H${c.high_c?.toFixed(0) ?? "—"} L${c.low_c?.toFixed(0) ?? "—"}</div>
+    </div>`).join("");
+}
+
+function mktRows(container, items) {
+  document.getElementById(container).innerHTML = items.map(q => `
+    <div class="mkt-row">
+      <span class="lbl">${q.label}</span>
+      <span class="val">${fmtNum(q.price)}</span>
+      <span class="chg ${clsChg(q.change_pct)}">${arrow(q.change_pct)} ${fmtPct(q.change_pct)}</span>
+    </div>`).join("");
+}
+
+function renderTicker(all) {
+  const items = all.commodity.concat(all.index, all.fx);
+  const html = items.map(q => `
+    <span class="bt-item"><span class="l">${q.label}</span><span class="v">${fmtNum(q.price)}</span>
+      <span class="c ${clsChg(q.change_pct)}"> ${arrow(q.change_pct)} ${fmtPct(q.change_pct)}</span></span>`).join("");
+  document.getElementById("ticker").innerHTML = html + html;
+}
+
+/* ---------------- Schedule (placeholder data) ---------------- */
+// Replace this array with a real calendar feed later (Google Calendar / Outlook / CalDAV).
+// Times are in GST (UTC+4). Each item: { t: "HH:MM", w: "description", location?: "..." }
+const SCHEDULE = [
+  { t: "07:00", w: "Morning brief",                     location: "Home" },
+  { t: "09:00", w: "Board call — Aramco partnership",   location: "Video" },
+  { t: "11:30", w: "Lunch — CEO, Emaar",                location: "Bulgari, Jumeirah Bay" },
+  { t: "14:00", w: "Strategy review — Q3 regional",     location: "HQ" },
+  { t: "16:30", w: "DXB → LHR (EK001)",                 location: "Terminal 3" },
+];
+
+function renderSchedule() {
+  // "Now" derived from Gulf Standard Time to make the demo feel real regardless of the user's locale.
+  const nowUtc = new Date();
+  const nowGst = new Date(nowUtc.getTime() + 4 * 3600 * 1000);
+  const nowMin = nowGst.getUTCHours() * 60 + nowGst.getUTCMinutes();
+
+  let nextItem = null, nextDelta = Infinity;
+  const html = SCHEDULE.map(it => {
+    const [hh, mm] = it.t.split(":").map(Number);
+    const min = hh * 60 + mm;
+    let klass = "sch-item";
+    if (min + 30 < nowMin) klass += " done";
+    else if (min <= nowMin && min + 30 >= nowMin) klass += " now";
+    else if (min - nowMin < nextDelta) { nextDelta = min - nowMin; nextItem = it; }
+    return `<div class="${klass}"><span class="t">${it.t}</span><span class="sep">·</span><span class="w">${it.w}</span></div>`;
+  }).join("");
+  document.getElementById("sch-items").innerHTML = html;
+
+  const dt = new Intl.DateTimeFormat(undefined, { timeZone: "Asia/Dubai", weekday: "short", day: "numeric", month: "short" }).format(new Date());
+  document.getElementById("sch-date").textContent = dt;
+  if (nextItem) {
+    const inStr = nextDelta >= 60 ? `${Math.floor(nextDelta/60)}h ${nextDelta%60}m` : `${nextDelta}m`;
+    document.getElementById("sch-next").textContent = `${nextItem.t} · ${nextItem.w}  (in ${inStr})`;
+  } else {
+    document.getElementById("sch-next").textContent = "Day clear";
+  }
+}
+renderSchedule();
+setInterval(renderSchedule, 60000);
+
+/* ---------------- Clock + boot ---------------- */
+function tickClock() {
+  const d = new Date();
+  const utc = d.toISOString().slice(11, 19) + "Z";
+  const gst = new Date(d.getTime() + 4*3600*1000).toISOString().slice(11,16) + " GST";
+  document.getElementById("clock").textContent = `${utc}  ·  ${gst}`;
+}
+setInterval(tickClock, 1000); tickClock();
+
+async function boot() {
+  try {
+    STATE = await loadSnapshot();
+    document.getElementById("c-src").textContent = "22";
+    document.getElementById("c-sync").textContent = new Date(STATE.generated_at).toISOString().slice(11,19) + "Z";
+    renderWx(STATE.weather);
+    mktRows("commodities", STATE.markets.commodity);
+    mktRows("indices",     STATE.markets.index);
+    mktRows("fx",          STATE.markets.fx);
+    renderTicker(STATE.markets);
+    renderEvents();
+    await renderMap((STATE.major_news || []).concat(STATE.minor_news || []));
+  } catch (e) {
+    document.body.prepend(errorBanner(e));
+  }
+}
+boot();
+window.addEventListener("resize", () => {
+  if (STATE) renderMap((STATE.major_news || []).concat(STATE.minor_news || []));
+});
+// Poll every 60s so tickers feel alive without full reload.
+setInterval(async () => {
+  try {
+    STATE = await loadSnapshot();
+    renderWx(STATE.weather);
+    mktRows("commodities", STATE.markets.commodity);
+    mktRows("indices",     STATE.markets.index);
+    mktRows("fx",          STATE.markets.fx);
+    renderTicker(STATE.markets);
+    renderEvents();
+    document.getElementById("c-sync").textContent = new Date(STATE.generated_at).toISOString().slice(11,19) + "Z";
+  } catch {}
+}, 60000);
+</script>
+</body>
+</html>
