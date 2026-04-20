@@ -30,8 +30,11 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: var(--bg); color: var(--text); overflow: hidden; }
+  /* Body is a 4-row grid so topbar/schedule/main/ticker always fit the viewport. */
   body {
-    font-family: "Inter", system-ui, sans-serif; font-size: 12.5px; line-height: 1.4;
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: clamp(10.5px, 0.78vw, 13px); line-height: 1.4;
+    display: grid; grid-template-rows: 44px 56px minmax(0, 1fr) 34px;
     background:
       radial-gradient(1600px 800px at 70% 10%, rgba(0, 212, 255, 0.045), transparent 60%),
       radial-gradient(900px 500px at 10% 90%, rgba(230, 103, 255, 0.04), transparent 60%),
@@ -43,14 +46,14 @@
 
   /* ---------- Top bar ---------- */
   .topbar {
-    height: 44px; display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between;
     padding: 0 20px; border-bottom: 1px solid var(--border);
     background: linear-gradient(180deg, rgba(10, 18, 32, 0.95), rgba(10, 18, 32, 0.85));
     backdrop-filter: blur(8px);
   }
   .tb-left, .tb-right { display: flex; align-items: center; gap: 22px; }
   .brand { display: flex; align-items: center; gap: 10px; }
-  .brand .chev { color: var(--cyan); font-family: "Orbitron"; font-weight: 700; letter-spacing: .18em; font-size: 13px; }
+  .brand .chev { color: var(--cyan); font-family: "Orbitron"; font-weight: 700; letter-spacing: .18em; font-size: clamp(12px, 0.95vw, 14px); }
   .brand .sep { color: var(--dim); font-size: 11px; }
   .brand .sub { color: var(--muted); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
   .sysind { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
@@ -63,8 +66,9 @@
   /* ---------- Schedule strip ---------- */
   .schedule {
     display: grid; grid-template-columns: 220px 1fr auto;
-    height: 56px; border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     background: linear-gradient(180deg, rgba(10, 18, 32, 0.75), rgba(10, 18, 32, 0.55));
+    min-height: 0;
   }
   .schedule .sch-label {
     display: flex; flex-direction: column; justify-content: center; padding: 0 18px;
@@ -75,7 +79,7 @@
   .schedule .sch-label .v .hl { color: var(--amber); }
   .schedule .sch-items {
     display: flex; align-items: center; gap: 22px; padding: 0 20px; overflow-x: auto;
-    font-size: 12px;
+    font-size: clamp(11px, 0.78vw, 13px);
   }
   .schedule .sch-item { display: flex; gap: 10px; align-items: baseline; white-space: nowrap; }
   .schedule .sch-item .t { font: 600 11px "JetBrains Mono", monospace; color: var(--cyan); letter-spacing: .04em; }
@@ -92,21 +96,28 @@
   }
 
   /* ---------- Main layout ---------- */
+  /* Main row of the body-grid takes whatever height is left; columns split inside. */
   .main-grid {
     display: grid;
-    grid-template-columns: 310px 1fr 340px;
-    grid-template-rows: calc(100vh - 44px - 56px - 34px);
+    grid-template-columns: minmax(260px, 310px) minmax(0, 1fr) minmax(280px, 340px);
     gap: 10px; padding: 10px;
+    min-height: 0;      /* critical so nested grids/flex can actually shrink */
+    overflow: hidden;
   }
   @media (max-width: 1280px) { .main-grid { grid-template-columns: 280px 1fr 300px; } }
-  @media (max-width: 1080px) { .main-grid { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; } html, body { overflow: auto; } }
+  @media (max-width: 1080px) {
+    .main-grid { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; overflow: visible; }
+    html, body { overflow: auto; display: block; }
+    body { height: auto; }
+  }
 
-  /* Panels */
+  /* ---------- Panels (shared) ---------- */
   .panel {
     background: linear-gradient(180deg, var(--panel), var(--panel-2));
     border: 1px solid var(--border); border-radius: 4px;
     position: relative; overflow: hidden;
     box-shadow: inset 0 1px 0 rgba(0, 212, 255, 0.04);
+    display: flex; flex-direction: column; min-height: 0;
   }
   .panel::before {
     content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -116,44 +127,92 @@
   }
   .panel .phead {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px; border-bottom: 1px solid var(--border);
-    font-family: "JetBrains Mono", monospace; font-size: 10.5px; letter-spacing: .18em;
-    text-transform: uppercase; color: var(--cyan);
+    padding: 8px 14px; border-bottom: 1px solid var(--border);
+    font-family: "JetBrains Mono", monospace; font-size: clamp(9.5px, 0.65vw, 11px);
+    letter-spacing: .18em; text-transform: uppercase; color: var(--cyan);
     background: rgba(0, 212, 255, 0.02);
-    position: relative; z-index: 1;
+    position: relative; z-index: 1; flex-shrink: 0;
   }
   .panel .phead .hcode { color: var(--muted); font-size: 10px; }
-  .panel .pbody { padding: 10px 14px; position: relative; z-index: 1; overflow-y: auto; max-height: calc(100vh - 140px); }
+  /* All panel bodies fill the remaining space; if they overflow they scroll themselves (not the page). */
+  .panel .pbody {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: 8px 12px; position: relative; z-index: 1;
+  }
 
-  /* ---------- Left rail: events ---------- */
-  .left-rail { display: flex; flex-direction: column; min-height: 0; }
-  .left-rail .pbody { flex: 1; min-height: 0; padding: 6px 10px; max-height: none; }
-  .region-pill-row { display: flex; gap: 4px; flex-wrap: wrap; padding: 10px 10px 6px; border-bottom: 1px dashed var(--border); }
-  .region-pill { font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--border-2); border-radius: 3px; color: var(--muted); cursor: pointer; background: transparent; }
-  .region-pill:hover { color: var(--text); border-color: var(--cyan-dim); }
-  .region-pill.active { color: var(--cyan); border-color: var(--cyan); background: rgba(0, 212, 255, 0.07); }
+  /* ---------- Left rail: workspace + events (grid split) ---------- */
+  .left-rail {
+    display: grid; grid-template-rows: 1fr 1fr; gap: 10px; min-height: 0;
+  }
+  @media (max-width: 1080px) {
+    .left-rail { grid-template-rows: auto auto; }
+  }
+  .left-rail .pbody { padding: 4px 10px; }
 
+  /* Tabs / pills (shared between workspace + event filter) */
+  .pill-row { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 10px 6px; border-bottom: 1px dashed var(--border); flex-shrink: 0; }
+  .pill { font: 500 10px/1 "JetBrains Mono", monospace; letter-spacing: .1em; text-transform: uppercase; padding: 5px 8px; border: 1px solid var(--border-2); border-radius: 3px; color: var(--muted); cursor: pointer; background: transparent; }
+  .pill:hover { color: var(--text); border-color: var(--cyan-dim); }
+  .pill.active { color: var(--cyan); border-color: var(--cyan); background: rgba(0, 212, 255, 0.07); }
+
+  .unread-badge {
+    display: inline-block; padding: 1px 6px; margin-left: 6px;
+    background: var(--amber); color: #000; font: 700 9px "JetBrains Mono", monospace;
+    border-radius: 10px; letter-spacing: .04em; vertical-align: middle;
+  }
+  .unread-badge:empty { display: none; }
+
+  /* ---------- Workspace items ---------- */
+  .ws-item {
+    padding: 8px 4px; border-bottom: 1px solid var(--border);
+    display: grid; gap: 8px; align-items: start;
+    cursor: pointer; font-size: clamp(11px, 0.78vw, 12.5px);
+    transition: background .15s;
+  }
+  .ws-item:last-child { border-bottom: 0; }
+  .ws-item:hover { background: rgba(0, 212, 255, 0.03); }
+  .ws-item .ts { color: var(--dim); font: 10.5px "JetBrains Mono", monospace; white-space: nowrap; flex-shrink: 0; }
+  .ws-item .sender { font: 600 9.5px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+
+  .ws-inbox { grid-template-columns: auto 1fr auto; }
+  .ws-inbox .dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 7px; flex-shrink: 0; }
+  .ws-inbox .dot.unread { background: var(--cyan); box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.18); }
+  .ws-inbox .dot.read { background: var(--dim); opacity: 0.55; }
+  .ws-inbox .subj { color: var(--text); line-height: 1.32; }
+
+  .ws-task { grid-template-columns: auto 1fr auto; align-items: center; }
+  .ws-task .check { width: 13px; height: 13px; border: 1px solid var(--border-2); border-radius: 2px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font: 700 10px monospace; color: transparent; }
+  .ws-task .check.done { background: var(--cyan); border-color: var(--cyan); color: #000; }
+  .ws-task .title { color: var(--text); line-height: 1.35; }
+  .ws-task.done .title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dim); }
+  .ws-task .due { font: 500 10px "JetBrains Mono", monospace; color: var(--amber); letter-spacing: .04em; white-space: nowrap; }
+
+  .ws-signal { grid-template-columns: 1fr auto; }
+  .ws-signal .snip { color: var(--text); line-height: 1.35; margin-top: 2px; }
+
+  /* ---------- Event feed items ---------- */
   .event {
-    padding: 10px 2px; border-bottom: 1px solid var(--border);
+    padding: 8px 2px; border-bottom: 1px solid var(--border);
     display: grid; grid-template-columns: auto 1fr auto; gap: 9px;
     cursor: pointer; transition: background .15s;
   }
   .event:hover { background: rgba(0, 212, 255, 0.03); }
-  .event .ring { width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; box-shadow: 0 0 0 3px currentColor; opacity: 0.7; }
-  .event.r-gulf        .ring { color: var(--cyan); }
-  .event.r-iran_war    .ring { color: var(--amber); }
-  .event.r-oil_markets .ring { color: var(--magenta); }
+  .event .ring { width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; box-shadow: 0 0 0 3px currentColor; opacity: 0.7; flex-shrink: 0; }
+  .event.r-gulf          .ring { color: var(--cyan); }
+  .event.r-iran_war      .ring { color: var(--amber); }
+  .event.r-oil_markets   .ring { color: var(--magenta); }
   .event.r-markets_macro .ring { color: var(--green); }
-  .event.r-global      .ring { color: var(--dim); }
+  .event.r-global        .ring { color: var(--dim); }
   .event .body { min-width: 0; }
   .event .src { font: 600 9.5px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
-  .event h4 { font-size: 12.5px; font-weight: 500; line-height: 1.32; color: var(--text); }
-  .event .ts { color: var(--dim); font: 10.5px "JetBrains Mono", monospace; white-space: nowrap; align-self: flex-start; margin-top: 3px; }
+  .event h4 { font-size: clamp(11.5px, 0.82vw, 13px); font-weight: 500; line-height: 1.32; color: var(--text); }
+  .event .ts { color: var(--dim); font: 10.5px "JetBrains Mono", monospace; white-space: nowrap; align-self: flex-start; margin-top: 3px; flex-shrink: 0; }
 
   /* ---------- Map panel ---------- */
-  .map-wrap { position: relative; display: flex; flex-direction: column; }
-  .map-wrap .pbody { flex: 1; padding: 0; max-height: none; position: relative; }
-  #map { width: 100%; height: 100%; display: block; }
+  .map-wrap { position: relative; }
+  .map-wrap .pbody { padding: 0; position: relative; overflow: hidden; }
+  #map { width: 100%; height: 100%; display: block; cursor: grab; }
+  #map:active { cursor: grabbing; }
   .map-corners { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
   .corner { position: absolute; font: 500 10px/1.3 "JetBrains Mono", monospace; letter-spacing: .1em; color: var(--muted); }
   .corner.tl { top: 12px; left: 14px; }
@@ -163,7 +222,7 @@
   .corner .k { color: var(--dim); margin-right: 6px; }
   .corner .v { color: var(--cyan); font-weight: 600; }
 
-  /* Zoom controls — placed below the top-right corner telemetry so they don't overlap */
+  /* Zoom controls — below the top-right corner telemetry */
   .zoomctl {
     position: absolute; top: 44px; right: 14px; display: flex; flex-direction: column;
     gap: 4px; z-index: 3; pointer-events: auto;
@@ -177,12 +236,6 @@
   }
   .zoomctl button:hover { border-color: var(--cyan); background: rgba(0, 212, 255, 0.1); }
   .zoomctl button:active { background: rgba(0, 212, 255, 0.18); }
-  .zoomctl .hint {
-    font: 500 9px "JetBrains Mono", monospace; letter-spacing: .12em; color: var(--dim);
-    text-transform: uppercase; text-align: center; margin-top: 4px; writing-mode: vertical-rl; transform: rotate(180deg);
-  }
-  #map { cursor: grab; }
-  #map:active { cursor: grabbing; }
 
   /* Reticle crosshairs */
   .reticle { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
@@ -211,26 +264,31 @@
   .spot-pulse { fill: none; stroke-width: 1.2; opacity: 0; animation: ring 2.6s ease-out infinite; }
   .spot-core  { stroke-width: 1.2; }
   @keyframes ring { 0% { r: 4; opacity: 0.9; } 100% { r: 22; opacity: 0; } }
-  .spot.r-gulf        .spot-pulse, .spot.r-gulf        .spot-core { stroke: var(--cyan);   fill: var(--cyan); }
-  .spot.r-iran_war    .spot-pulse, .spot.r-iran_war    .spot-core { stroke: var(--amber);  fill: var(--amber); }
-  .spot.r-oil_markets .spot-pulse, .spot.r-oil_markets .spot-core { stroke: var(--magenta); fill: var(--magenta); }
-  .spot.r-markets_macro .spot-pulse, .spot.r-markets_macro .spot-core { stroke: var(--green); fill: var(--green); }
-  .spot.r-global      .spot-pulse, .spot.r-global      .spot-core { stroke: #9AB1CC; fill: #9AB1CC; }
+  .spot.r-gulf          .spot-pulse, .spot.r-gulf          .spot-core { stroke: var(--cyan);   fill: var(--cyan); }
+  .spot.r-iran_war      .spot-pulse, .spot.r-iran_war      .spot-core { stroke: var(--amber);  fill: var(--amber); }
+  .spot.r-oil_markets   .spot-pulse, .spot.r-oil_markets   .spot-core { stroke: var(--magenta); fill: var(--magenta); }
+  .spot.r-markets_macro .spot-pulse, .spot.r-markets_macro .spot-core { stroke: var(--green);  fill: var(--green); }
+  .spot.r-global        .spot-pulse, .spot.r-global        .spot-core { stroke: #9AB1CC; fill: #9AB1CC; }
   .spot.active .spot-core { r: 5; filter: drop-shadow(0 0 4px currentColor); }
   .spot-label { font: 500 9.5px "JetBrains Mono", monospace; letter-spacing: .08em; fill: var(--muted); pointer-events: none; text-transform: uppercase; }
 
-  /* ---------- Right rail ---------- */
-  .right-rail { display: grid; grid-template-rows: auto auto auto auto; gap: 10px; min-height: 0; }
-  .right-rail .panel { display: flex; flex-direction: column; min-height: 0; }
-  .right-rail .pbody { max-height: none; padding: 10px 12px; }
+  /* ---------- Right rail (4 equal rows) ---------- */
+  .right-rail {
+    display: grid; grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 10px; min-height: 0;
+  }
+  @media (max-width: 1080px) {
+    .right-rail { grid-template-rows: repeat(4, auto); }
+  }
+  .right-rail .pbody { padding: 8px 12px; }
 
   .wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .wx-cell { border: 1px solid var(--border); background: rgba(14, 24, 40, 0.5); padding: 7px 9px; border-radius: 2px; }
+  .wx-cell { border: 1px solid var(--border); background: rgba(14, 24, 40, 0.5); padding: 6px 9px; border-radius: 2px; }
   .wx-cell .c { font: 600 10px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  .wx-cell .t { font-family: "JetBrains Mono", monospace; font-size: 18px; font-weight: 500; color: var(--text); margin-top: 2px; }
+  .wx-cell .t { font-family: "JetBrains Mono", monospace; font-size: clamp(14px, 1.1vw, 19px); font-weight: 500; color: var(--text); margin-top: 2px; }
   .wx-cell .sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
-  .mkt-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: 11.5px; }
+  .mkt-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: clamp(10.5px, 0.72vw, 12px); }
   .mkt-row:last-child { border-bottom: 0; }
   .mkt-row .lbl { color: var(--muted); font: 600 10.5px "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
   .mkt-row .val { font-family: "JetBrains Mono", monospace; font-weight: 500; color: var(--text); }
@@ -239,9 +297,8 @@
   .mkt-row .chg.down { color: var(--red); }
   .mkt-row .chg.flat { color: var(--dim); }
 
-  /* ---------- Bottom ticker ---------- */
+  /* ---------- Bottom ticker (grid row 4, not fixed) ---------- */
   .bottom-ticker {
-    position: fixed; bottom: 0; left: 0; right: 0; height: 34px;
     background: rgba(7, 12, 22, 0.95); border-top: 1px solid var(--border);
     overflow: hidden; white-space: nowrap; display: flex; align-items: center;
   }
@@ -292,19 +349,36 @@
 
 <div class="main-grid">
 
-  <!-- Left rail: event feed -->
-  <section class="panel left-rail">
-    <div class="phead"><span>Event Feed</span><span class="hcode mono" id="event-count">—</span></div>
-    <div class="region-pill-row" id="region-pills">
-      <button class="region-pill active" data-r="">ALL</button>
-      <button class="region-pill" data-r="gulf">Gulf</button>
-      <button class="region-pill" data-r="iran_war">Iran/War</button>
-      <button class="region-pill" data-r="oil_markets">Oil</button>
-      <button class="region-pill" data-r="markets_macro">Macro</button>
-      <button class="region-pill" data-r="global">Global</button>
-    </div>
-    <div class="pbody" id="events"></div>
-  </section>
+  <!-- Left rail: workspace (top) + event feed (bottom) -->
+  <aside class="left-rail">
+
+    <section class="panel">
+      <div class="phead">
+        <span>Workspace <span class="unread-badge" id="ws-unread"></span></span>
+        <span class="hcode mono">SAMPLE</span>
+      </div>
+      <div class="pill-row" id="ws-tabs">
+        <button class="pill active" data-tab="inbox">Inbox</button>
+        <button class="pill" data-tab="tasks">Tasks</button>
+        <button class="pill" data-tab="signals">Signals</button>
+      </div>
+      <div class="pbody" id="workspace-body"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead"><span>Event Feed</span><span class="hcode mono" id="event-count">—</span></div>
+      <div class="pill-row" id="region-pills">
+        <button class="pill active" data-r="">ALL</button>
+        <button class="pill" data-r="gulf">Gulf</button>
+        <button class="pill" data-r="iran_war">Iran/War</button>
+        <button class="pill" data-r="oil_markets">Oil</button>
+        <button class="pill" data-r="markets_macro">Macro</button>
+        <button class="pill" data-r="global">Global</button>
+      </div>
+      <div class="pbody" id="events"></div>
+    </section>
+
+  </aside>
 
   <!-- Map panel -->
   <section class="panel map-wrap">
@@ -368,9 +442,78 @@
 <script type="module">
 import { loadSnapshot, fmtPct, fmtNum, relTime, errorBanner } from "../shared.js";
 
-// Map is zoomed to the Middle East. Hotspots here are all ME-local so they
-// show as pulses on-map; broader-region news still flows through the sidebar
-// and filter pills, just without a spatial pin.
+/* ---------------- Personal data (placeholders) ---------------- */
+// SWAP HERE when integrating Gmail / Google Calendar / Slack / Outlook.
+// Each object is a plain render-input; replace the constant with a fetch that
+// returns the same shape and the UI will pick it up without further changes.
+const PERSONAL = {
+  inbox: [
+    { sender: "Amit Jain · Emaar",           subject: "Re: Q3 review and site visit",                         time: "08:42", unread: true  },
+    { sender: "Goldman Sachs MENA",          subject: "Pricing on UAE sovereign tap — draft term sheet",      time: "08:15", unread: true  },
+    { sender: "Fatima Al Hashimi · HR",      subject: "Board pack uploaded — please review before 13:00",     time: "07:55", unread: true  },
+    { sender: "Marie · Assistant",           subject: "Car to DIFC 13:45 · Terminal 3 pickup 15:40",          time: "07:30", unread: false },
+    { sender: "Rashid · CFO",                subject: "Weekly cash position snapshot",                        time: "06:58", unread: false },
+  ],
+  tasks: [
+    { title: "Review Aramco partnership term sheet",                  due: "10:00", done: false },
+    { title: "Sign off on Q3 earnings call script",                    due: null,    done: false },
+    { title: "Approve Dubai HQ expansion capex",                       due: "14:30", done: false },
+    { title: "Call Minister re: free-zone regulatory framework",       due: null,    done: false },
+    { title: "Prep opening remarks — Future Investment Initiative",    due: null,    done: true  },
+  ],
+  signals: [
+    { sender: "Rashid · CFO",   snippet: "Numbers are in — up 12% YoY. Walk you through at 09:30.", time: "08:40" },
+    { sender: "Chairman",       snippet: "Let's sync 10 min before the DXB flight.",                time: "08:30" },
+    { sender: "Ayesha · Legal", snippet: "Counterpart redlines received. Nothing blocking.",        time: "07:48" },
+  ],
+};
+
+let workspaceTab = "inbox";
+
+function renderWorkspace() {
+  const body = document.getElementById("workspace-body");
+  const { inbox, tasks, signals } = PERSONAL;
+  const unread = inbox.filter(i => i.unread).length;
+  document.getElementById("ws-unread").textContent = unread ? `${unread}` : "";
+
+  if (workspaceTab === "inbox") {
+    body.innerHTML = inbox.map(i => `
+      <div class="ws-item ws-inbox">
+        <span class="dot ${i.unread ? 'unread' : 'read'}"></span>
+        <div>
+          <div class="sender">${i.sender}</div>
+          <div class="subj">${i.subject}</div>
+        </div>
+        <span class="ts">${i.time}</span>
+      </div>`).join("");
+  } else if (workspaceTab === "tasks") {
+    body.innerHTML = tasks.map(t => `
+      <div class="ws-item ws-task ${t.done ? 'done' : ''}">
+        <span class="check ${t.done ? 'done' : ''}">${t.done ? '✓' : ''}</span>
+        <div class="title">${t.title}</div>
+        ${t.due ? `<span class="due">◴ ${t.due}</span>` : `<span></span>`}
+      </div>`).join("");
+  } else {
+    body.innerHTML = signals.map(s => `
+      <div class="ws-item ws-signal">
+        <div>
+          <div class="sender">${s.sender}</div>
+          <div class="snip">${s.snippet}</div>
+        </div>
+        <span class="ts">${s.time}</span>
+      </div>`).join("");
+  }
+}
+
+document.getElementById("ws-tabs").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll("#ws-tabs button").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  workspaceTab = e.target.dataset.tab;
+  renderWorkspace();
+});
+
+/* ---------------- Map hotspots ---------------- */
 const HOTSPOTS = [
   { key: "dubai",     name: "Dubai",     lat: 25.20, lon: 55.27, region: "gulf",     match: t => /dubai|uae|emirates|abu dhabi|dp world|emaar|etihad/i.test(t) },
   { key: "riyadh",    name: "Riyadh",    lat: 24.71, lon: 46.68, region: "gulf",     match: t => /saudi|riyadh|aramco|neom|pif|public investment fund|jeddah/i.test(t) },
@@ -387,15 +530,10 @@ const HOTSPOTS = [
   { key: "cairo",     name: "Cairo",     lat: 30.04, lon: 31.23, region: "global",   match: t => /egypt|cairo|suez/i.test(t) },
 ];
 
-// The projection is fitted to the wider Middle East bbox so that zooming out
-// stays meaningful. The *initial* view is computed from the tighter Gulf bbox
-// and applied via a zoom transform on load.
 const ME_BBOX = {
   type: "Feature",
   geometry: { type: "Polygon", coordinates: [[[25, 10], [65, 10], [65, 42], [25, 42], [25, 10]]] }
 };
-// Tighter, Dubai-centric default: shows full UAE, Qatar, Bahrain, eastern Saudi
-// (Dhahran/Dammam), southern Kuwait, Musandam, and the Iranian south coast.
 const GULF_BBOX = {
   type: "Feature",
   geometry: { type: "Polygon", coordinates: [[[48, 22], [58, 22], [58, 29], [48, 29], [48, 22]]] }
@@ -407,45 +545,37 @@ const tip = document.getElementById("tooltip");
 function clsChg(x){ return x > 0 ? "up" : x < 0 ? "down" : "flat"; }
 function arrow(x) { return x > 0 ? "▲" : x < 0 ? "▼" : "■"; }
 
-/* ---------------- Map ---------------- */
-let MAP = null;  // holds projection + zoom handle across redraws
+let MAP = null;
 
 async function renderMap(articles) {
   const svg = d3.select("#map");
   const pbody = document.querySelector(".map-wrap .pbody");
   const w = pbody.clientWidth;
   const h = pbody.clientHeight;
+  if (w < 10 || h < 10) return;       // guard during layout thrash
   svg.attr("viewBox", `0 0 ${w} ${h}`).attr("width", w).attr("height", h);
   svg.selectAll("*").remove();
 
-  // 50m atlas has enough detail for a Gulf-zoom view.
   const topology = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json").then(r => r.json());
   const land = topojson.feature(topology, topology.objects.countries);
   const borders = topojson.mesh(topology, topology.objects.countries, (a, b) => a !== b);
 
-  // Projection fits the wider Middle East — zoom-out remains meaningful.
   const projection = d3.geoMercator().fitExtent([[12, 12], [w - 12, h - 12]], ME_BBOX);
   const path = d3.geoPath(projection);
 
-  // Clip to panel so countries extending past the bbox crop cleanly.
   svg.append("defs").append("clipPath").attr("id", "mapclip")
     .append("rect").attr("x", 0).attr("y", 0).attr("width", w).attr("height", h);
 
-  // Two layers: `mapLayer` takes the zoom transform (pan/zoom moves countries);
-  // `spotLayer` repositions hotspots manually so their circles/labels stay the
-  // same visual size at every zoom level.
   const root = svg.append("g").attr("clip-path", "url(#mapclip)");
   const mapLayer  = root.append("g").attr("class", "map-layer");
   const spotLayer = root.append("g").attr("class", "spot-layer");
 
-  // Map content
   const graticule = d3.geoGraticule().step([5, 5]);
   mapLayer.append("path").attr("class", "graticule").attr("d", path(graticule())).attr("vector-effect", "non-scaling-stroke");
   mapLayer.append("g").selectAll("path").data(land.features)
     .join("path").attr("class", "country").attr("d", path).attr("vector-effect", "non-scaling-stroke");
   mapLayer.append("path").attr("class", "outline").attr("d", path(borders)).attr("vector-effect", "non-scaling-stroke");
 
-  // Article → hotspot counts
   const counts = Object.fromEntries(HOTSPOTS.map(h => [h.key, 0]));
   const topByHotspot = Object.fromEntries(HOTSPOTS.map(h => [h.key, []]));
   for (const a of articles) {
@@ -457,7 +587,6 @@ async function renderMap(articles) {
     }
   }
 
-  // Data-bind hotspots so we can reposition them in the zoom handler.
   const spot = spotLayer.selectAll(".spot").data(HOTSPOTS, d => d.key).join("g")
     .attr("class", d => `spot r-${d.region}`)
     .on("mousemove", (ev, d) => showTip(ev, d, topByHotspot[d.key], counts[d.key]))
@@ -479,7 +608,6 @@ async function renderMap(articles) {
     });
   }
 
-  // Zoom behavior
   const zoom = d3.zoom()
     .scaleExtent([0.6, 10])
     .on("zoom", (event) => {
@@ -488,10 +616,8 @@ async function renderMap(articles) {
       document.getElementById("c-view").textContent = `${event.transform.k.toFixed(1)}× · ${describeView(event.transform, projection, w, h)}`;
     });
   svg.call(zoom);
-  // Double-click default is noisy; keep wheel + drag only.
   svg.on("dblclick.zoom", null);
 
-  // Compute initial transform that shows only the Gulf bbox, centered.
   const [[x0, y0], [x1, y1]] = path.bounds(GULF_BBOX);
   const bx = Math.max(1, x1 - x0), by = Math.max(1, y1 - y0);
   const k = Math.min(w / bx, h / by) * 0.95;
@@ -499,15 +625,12 @@ async function renderMap(articles) {
   const initial = d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(k);
   svg.call(zoom.transform, initial);
 
-  // Update corner counters
   const active = HOTSPOTS.filter(h => counts[h.key] > 0).length;
   document.getElementById("c-spots").textContent = `${active}/${HOTSPOTS.length}`;
 
   MAP = { zoom, svg, initial, projection };
 }
 
-// Rough label for the current view: reports whether the user is looking at
-// Gulf-only, Middle East, or zoomed in tighter.
 function describeView(t, projection, w, h) {
   const center = projection.invert ? projection.invert([(w/2 - t.x) / t.k, (h/2 - t.y) / t.k]) : null;
   if (!center) return "MIDDLE EAST";
@@ -517,7 +640,6 @@ function describeView(t, projection, w, h) {
   return "MIDDLE EAST";
 }
 
-// Wire zoom control buttons after boot.
 function wireZoomControls() {
   document.querySelectorAll("[data-zoom]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -567,7 +689,7 @@ function renderEvents() {
 }
 document.getElementById("region-pills").addEventListener("click", e => {
   if (e.target.tagName !== "BUTTON") return;
-  document.querySelectorAll(".region-pill").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll("#region-pills button").forEach(b => b.classList.remove("active"));
   e.target.classList.add("active");
   currentRegion = e.target.dataset.r;
   renderEvents();
@@ -600,19 +722,17 @@ function renderTicker(all) {
   document.getElementById("ticker").innerHTML = html + html;
 }
 
-/* ---------------- Schedule (placeholder data) ---------------- */
-// Replace this array with a real calendar feed later (Google Calendar / Outlook / CalDAV).
-// Times are in GST (UTC+4). Each item: { t: "HH:MM", w: "description", location?: "..." }
+/* ---------------- Schedule strip ---------------- */
+// SWAP HERE when integrating a real calendar feed (Google Calendar / Outlook).
 const SCHEDULE = [
-  { t: "07:00", w: "Morning brief",                     location: "Home" },
-  { t: "09:00", w: "Board call — Aramco partnership",   location: "Video" },
-  { t: "11:30", w: "Lunch — CEO, Emaar",                location: "Bulgari, Jumeirah Bay" },
-  { t: "14:00", w: "Strategy review — Q3 regional",     location: "HQ" },
-  { t: "16:30", w: "DXB → LHR (EK001)",                 location: "Terminal 3" },
+  { t: "07:00", w: "Morning brief",                   location: "Home" },
+  { t: "09:00", w: "Board call — Aramco partnership", location: "Video" },
+  { t: "11:30", w: "Lunch — CEO, Emaar",              location: "Bulgari, Jumeirah Bay" },
+  { t: "14:00", w: "Strategy review — Q3 regional",   location: "HQ" },
+  { t: "16:30", w: "DXB → LHR (EK001)",               location: "Terminal 3" },
 ];
 
 function renderSchedule() {
-  // "Now" derived from Gulf Standard Time to make the demo feel real regardless of the user's locale.
   const nowUtc = new Date();
   const nowGst = new Date(nowUtc.getTime() + 4 * 3600 * 1000);
   const nowMin = nowGst.getUTCHours() * 60 + nowGst.getUTCMinutes();
@@ -652,6 +772,7 @@ setInterval(tickClock, 1000); tickClock();
 
 async function boot() {
   try {
+    renderWorkspace();
     STATE = await loadSnapshot();
     document.getElementById("c-src").textContent = "22";
     document.getElementById("c-sync").textContent = new Date(STATE.generated_at).toISOString().slice(11,19) + "Z";
@@ -668,10 +789,16 @@ async function boot() {
   }
 }
 boot();
+
+// Re-fit the map when the viewport changes. Debounced so fast drags don't thrash.
+let resizeT = null;
 window.addEventListener("resize", () => {
-  if (STATE) renderMap((STATE.major_news || []).concat(STATE.minor_news || []));
+  if (!STATE) return;
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => renderMap((STATE.major_news || []).concat(STATE.minor_news || [])), 150);
 });
-// Poll every 60s so tickers feel alive without full reload.
+
+// Refresh dynamic widgets every 60s so the tape feels alive without reloads.
 setInterval(async () => {
   try {
     STATE = await loadSnapshot();
