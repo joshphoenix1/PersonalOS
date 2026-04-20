@@ -395,15 +395,16 @@
         </svg>
       </div>
       <div class="map-corners">
-        <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">GULF</span></div>
+        <div class="corner tl"><span class="k">VIEW</span><span class="v" id="c-view">MIDDLE EAST</span></div>
         <div class="corner tr"><span class="k">HOTSPOTS</span><span class="v" id="c-spots">—</span></div>
         <div class="corner bl"><span class="k">SOURCES ACTIVE</span><span class="v" id="c-src">—</span></div>
         <div class="corner br"><span class="k">LAST SYNC</span><span class="v mono" id="c-sync">—</span></div>
       </div>
       <div class="zoomctl">
-        <button data-zoom="in"  title="Zoom in">+</button>
-        <button data-zoom="out" title="Zoom out">−</button>
-        <button data-zoom="reset" title="Reset to Gulf">⟲</button>
+        <button data-zoom="in"    title="Zoom in">+</button>
+        <button data-zoom="out"   title="Zoom out">−</button>
+        <button data-zoom="gulf"  title="Jump to Gulf">G</button>
+        <button data-zoom="reset" title="Reset to Middle East">⟲</button>
       </div>
     </div>
   </section>
@@ -618,17 +619,28 @@ async function renderMap(articles) {
   svg.call(zoom);
   svg.on("dblclick.zoom", null);
 
-  const [[x0, y0], [x1, y1]] = path.bounds(GULF_BBOX);
-  const bx = Math.max(1, x1 - x0), by = Math.max(1, y1 - y0);
-  const k = Math.min(w / bx, h / by) * 0.95;
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  const initial = d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(k);
+  // Projection already fits ME_BBOX, so identity = the Middle East view.
+  // Gulf is computed as a quick-zoom target for the "G" button.
+  const initial = d3.zoomIdentity;
+  const gulfTransform = (() => {
+    const [[x0, y0], [x1, y1]] = path.bounds(GULF_BBOX);
+    const bx = Math.max(1, x1 - x0), by = Math.max(1, y1 - y0);
+    const k = Math.min(w / bx, h / by) * 0.95;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    return d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(k);
+  })();
   svg.call(zoom.transform, initial);
+  // Belt-and-suspenders: directly apply the transform in case the synthetic
+  // zoom event is deferred in some browser paths. Keeps the initial render
+  // deterministic regardless of event timing.
+  mapLayer.attr("transform", initial.toString());
+  positionSpots(initial);
+  document.getElementById("c-view").textContent = `${initial.k.toFixed(1)}× · ${describeView(initial, projection, w, h)}`;
 
   const active = HOTSPOTS.filter(h => counts[h.key] > 0).length;
   document.getElementById("c-spots").textContent = `${active}/${HOTSPOTS.length}`;
 
-  MAP = { zoom, svg, initial, projection };
+  MAP = { zoom, svg, initial, gulfTransform, projection };
 }
 
 function describeView(t, projection, w, h) {
@@ -645,10 +657,11 @@ function wireZoomControls() {
     btn.addEventListener("click", () => {
       if (!MAP) return;
       const action = btn.dataset.zoom;
-      const { zoom, svg, initial } = MAP;
-      if (action === "reset")   svg.transition().duration(500).call(zoom.transform, initial);
-      else if (action === "in") svg.transition().duration(250).call(zoom.scaleBy, 1.5);
-      else if (action === "out") svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.5);
+      const { zoom, svg, initial, gulfTransform } = MAP;
+      if      (action === "reset") svg.transition().duration(500).call(zoom.transform, initial);
+      else if (action === "gulf")  svg.transition().duration(500).call(zoom.transform, gulfTransform);
+      else if (action === "in")    svg.transition().duration(250).call(zoom.scaleBy, 1.5);
+      else if (action === "out")   svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.5);
     });
   });
 }
