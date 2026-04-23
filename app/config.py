@@ -76,6 +76,42 @@ SOURCES: list[Source] = [
            "https://news.google.com/rss/search?q=site:meed.com+when:1d&hl=en-US&gl=US&ceid=US:en", 0.85, "gulf"),
     Source("Gulf Business", "gulfbusiness.com", "google_news",
            "https://news.google.com/rss/search?q=site:gulfbusiness.com+when:1d&hl=en-US&gl=US&ceid=US:en", 0.75, "gulf"),
+
+    # --- Oil / energy ---
+    Source("OilPrice.com", "oilprice.com", "rss",
+           "https://oilprice.com/rss/main", 0.90, "mixed"),
+    Source("S&P Global Energy", "spglobal.com", "google_news",
+           "https://news.google.com/rss/search?q=site:spglobal.com+oil+OR+LNG+OR+energy+OR+OPEC+when:1d&hl=en-US&gl=US&ceid=US:en", 0.90, "mixed"),
+    Source("Energy Intelligence", "energyintel.com", "google_news",
+           "https://news.google.com/rss/search?q=site:energyintel.com+when:1d&hl=en-US&gl=US&ceid=US:en", 0.90, "mixed"),
+    Source("Upstream Online", "upstreamonline.com", "google_news",
+           "https://news.google.com/rss/search?q=site:upstreamonline.com+when:1d&hl=en-US&gl=US&ceid=US:en", 0.85, "mixed"),
+
+    # --- Gulf think-tanks / newsletters ---
+    Source("AGSIW", "agsiw.org", "rss",
+           "https://agsiw.org/feed/", 0.95, "gulf"),
+    Source("Gulf Int'l Forum", "gulfif.org", "google_news",
+           "https://news.google.com/rss/search?q=site:gulfif.org+when:7d&hl=en-US&gl=US&ceid=US:en", 0.90, "gulf"),
+    Source("MEI", "mei.edu", "google_news",
+           "https://news.google.com/rss/search?q=site:mei.edu+when:7d&hl=en-US&gl=US&ceid=US:en", 0.90, "mixed"),
+    Source("Chatham House MENA", "chathamhouse.org", "google_news",
+           "https://news.google.com/rss/search?q=site:chathamhouse.org+middle+east+OR+gulf+OR+iran+when:14d&hl=en-US&gl=US&ceid=US:en", 0.88, "mixed"),
+
+    # --- Geopolitics / conflict analysis ---
+    Source("Middle East Eye", "middleeasteye.net", "rss",
+           "https://www.middleeasteye.net/rss", 0.85, "mixed"),
+    Source("Al Monitor", "al-monitor.com", "google_news",
+           "https://news.google.com/rss/search?q=site:al-monitor.com+when:1d&hl=en-US&gl=US&ceid=US:en", 0.88, "mixed"),
+    Source("Crisis Group", "crisisgroup.org", "google_news",
+           "https://news.google.com/rss/search?q=site:crisisgroup.org+middle+east+OR+gulf+OR+iran+when:14d&hl=en-US&gl=US&ceid=US:en", 0.88, "mixed"),
+    Source("Foreign Policy ME", "foreignpolicy.com", "google_news",
+           "https://news.google.com/rss/search?q=site:foreignpolicy.com+middle+east+OR+gulf+OR+iran+OR+saudi+when:3d&hl=en-US&gl=US&ceid=US:en", 0.85, "mixed"),
+
+    # --- Finance / macro ---
+    Source("FT Middle East", "ft.com", "google_news",
+           "https://news.google.com/rss/search?q=site:ft.com+gulf+OR+UAE+OR+saudi+OR+OPEC+when:1d&hl=en-US&gl=US&ceid=US:en", 0.95, "mixed"),
+    Source("The Economist ME", "economist.com", "google_news",
+           "https://news.google.com/rss/search?q=site:economist.com+middle+east+OR+gulf+OR+oil+when:7d&hl=en-US&gl=US&ceid=US:en", 0.90, "mixed"),
 ]
 
 

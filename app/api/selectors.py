@@ -102,7 +102,7 @@ def snapshot() -> dict[str, Any]:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "major_news": get_major_news(),
-        "minor_news": get_minor_news(limit=30),
+        "minor_news": get_minor_news(limit=60),
         "markets": get_markets(),
         "weather": get_weather(),
     }

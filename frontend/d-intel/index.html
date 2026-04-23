@@ -6,7 +6,7 @@
 <title>Intel Ops — News Aggregator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <style>
@@ -85,10 +85,10 @@
   }
   @media (max-width: 1080px) { .left-rail { grid-template-rows: auto auto auto auto; } }
 
-  /* Center column: map on top (bigger), event feed below. */
+  /* Center column: map on top (smaller), event feed below. */
   .center-col {
     display: grid;
-    grid-template-rows: 2.1fr 1fr;
+    grid-template-rows: 1fr 1.6fr;
     gap: 10px; min-height: 0;
   }
   @media (max-width: 1080px) { .center-col { grid-template-rows: auto auto; } }
@@ -206,6 +206,10 @@
   .event .src { font: 600 9.5px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
   .event h4 { font-size: clamp(11.5px, 0.82vw, 13px); font-weight: 500; line-height: 1.32; color: var(--text); }
   .event .ts { color: var(--dim); font: 10.5px "JetBrains Mono", monospace; white-space: nowrap; align-self: flex-start; margin-top: 3px; flex-shrink: 0; }
+
+  /* ---------- Feed section labels ---------- */
+  .feed-section { padding: 6px 2px 3px; border-bottom: 1px solid var(--border-2); margin-bottom: 2px; }
+  .feed-label { font: 600 9px/1 "JetBrains Mono", monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--cyan); opacity: 0.7; }
 
   /* ---------- Map panel ---------- */
   .map-wrap { position: relative; }
@@ -764,21 +768,39 @@ function positionTip(ev) {
 function hideTip() { tip.style.display = "none"; }
 
 /* ---------------- Event feed ---------------- */
+const REGION_LABELS = { gulf: "Gulf", iran_war: "Iran / War", oil_markets: "Oil Markets", markets_macro: "Macro", global: "Global" };
+const REGION_ORDER  = ["gulf", "iran_war", "oil_markets", "markets_macro", "global"];
 let currentRegion = "";
+
+function eventCard(a) {
+  return `<a class="event r-${a.region}" href="${a.url}" target="_blank" rel="noopener">
+    <span class="ring"></span>
+    <div class="body"><div class="src">${a.source}</div><h4>${a.title}</h4></div>
+    <span class="ts">${relTime(a.published_at || a.fetched_at)}</span>
+  </a>`;
+}
+
 function renderEvents() {
   const items = (STATE.major_news || []).concat(STATE.minor_news || []);
-  const filtered = currentRegion ? items.filter(x => x.region === currentRegion) : items;
-  document.getElementById("event-count").textContent = `${filtered.length} events`;
-  const html = filtered.slice(0, 40).map(a => `
-    <a class="event r-${a.region}" href="${a.url}" target="_blank" rel="noopener">
-      <span class="ring"></span>
-      <div class="body">
-        <div class="src">${a.source}</div>
-        <h4>${a.title}</h4>
-      </div>
-      <span class="ts">${relTime(a.published_at || a.fetched_at)}</span>
-    </a>`).join("");
-  fitRender(document.getElementById("events"), html);
+  const el = document.getElementById("events");
+
+  if (currentRegion) {
+    const filtered = items.filter(x => x.region === currentRegion).slice(0, 6);
+    document.getElementById("event-count").textContent = `${filtered.length} events`;
+    fitRender(el, filtered.map(eventCard).join(""));
+  } else {
+    // ALL: 6 per category, grouped with section labels
+    let total = 0;
+    const html = REGION_ORDER.map(r => {
+      const bucket = items.filter(x => x.region === r).slice(0, 6);
+      if (!bucket.length) return "";
+      total += bucket.length;
+      return `<div class="feed-section"><span class="feed-label">${REGION_LABELS[r]}</span></div>` +
+             bucket.map(eventCard).join("");
+    }).join("");
+    document.getElementById("event-count").textContent = `${total} events`;
+    fitRender(el, html);
+  }
 }
 document.getElementById("region-pills").addEventListener("click", e => {
   if (e.target.tagName !== "BUTTON") return;
