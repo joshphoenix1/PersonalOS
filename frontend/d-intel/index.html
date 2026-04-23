@@ -385,7 +385,7 @@
           <button data-zoom="out"   title="Zoom out">−</button>
           <button data-zoom="gulf"  title="Jump to Gulf">G</button>
           <button data-zoom="me"    title="Jump to Middle East">M</button>
-          <button data-zoom="reset" title="Reset to Dubai">⟲</button>
+          <button data-zoom="reset" title="Reset to Europe + ME">⟲</button>
         </div>
       </div>
     </section>
@@ -488,9 +488,12 @@ const HOTSPOTS = [
   { key: "cairo",     name: "Cairo",     lat: 30.04, lon: 31.23, region: "global",   match: t => /egypt|cairo|suez/i.test(t) },
 ];
 
-// Projection fits ME so zooming out stays meaningful. The *initial* load
-// view is Dubai (tight aerial on UAE + neighbors); Gulf and ME are one click
-// away via the M / G buttons.
+// Projection fits Europe + Middle East so the *initial* load view shows
+// both theatres at once. M / G / ⟲ jump to Middle East / Gulf / Dubai.
+const EURO_ME_BBOX = {
+  type: "Feature",
+  geometry: { type: "Polygon", coordinates: [[[-12, 22], [62, 22], [62, 62], [-12, 62], [-12, 22]]] }
+};
 const ME_BBOX = {
   type: "Feature",
   geometry: { type: "Polygon", coordinates: [[[25, 10], [65, 10], [65, 42], [25, 42], [25, 10]]] }
@@ -624,7 +627,7 @@ async function renderMap(articles) {
   const land = topojson.feature(topology, topology.objects.countries);
   const borders = topojson.mesh(topology, topology.objects.countries, (a, b) => a !== b);
 
-  const projection = d3.geoMercator().fitExtent([[12, 12], [w - 12, h - 12]], ME_BBOX);
+  const projection = d3.geoMercator().fitExtent([[12, 12], [w - 12, h - 12]], EURO_ME_BBOX);
   const path = d3.geoPath(projection);
 
   svg.append("defs").append("clipPath").attr("id", "mapclip")
@@ -691,10 +694,18 @@ async function renderMap(articles) {
     return d3.zoomIdentity.translate(w / 2 - k * cx, h / 2 - k * cy).scale(k);
   };
 
-  const dubaiTransform = fitBbox(DUBAI_BBOX);
-  const gulfTransform  = fitBbox(GULF_BBOX);
-  const meTransform    = d3.zoomIdentity;   // projection already fits ME
-  const initial        = dubaiTransform;
+  // Helper: transform that puts a given lon/lat at viewport centre at zoom k.
+  const centerAt = (lon, lat, k) => {
+    const [px, py] = projection([lon, lat]);
+    return d3.zoomIdentity.translate(w / 2 - k * px, h / 2 - k * py).scale(k);
+  };
+
+  const dubaiTransform   = fitBbox(DUBAI_BBOX);
+  const gulfTransform    = fitBbox(GULF_BBOX);
+  const meTransform      = fitBbox(ME_BBOX);
+  const euroMeTransform  = d3.zoomIdentity;            // projection already fits Europe+ME
+  const istanbulTransform = centerAt(28.98, 41.01, 6); // requested default
+  const initial          = istanbulTransform;
 
   svg.call(zoom.transform, initial);
   // Belt-and-suspenders: apply to layers directly in case the synthetic
@@ -706,17 +717,17 @@ async function renderMap(articles) {
   const active = HOTSPOTS.filter(h => counts[h.key] > 0).length;
   document.getElementById("c-spots").textContent = `${active}/${HOTSPOTS.length}`;
 
-  MAP = { zoom, svg, initial, dubaiTransform, gulfTransform, meTransform, projection };
+  MAP = { zoom, svg, initial, dubaiTransform, gulfTransform, meTransform, euroMeTransform, istanbulTransform, projection };
 }
 
 function describeView(t, projection, w, h) {
   const center = projection.invert ? projection.invert([(w/2 - t.x) / t.k, (h/2 - t.y) / t.k]) : null;
-  if (!center) return "DUBAI";
+  if (!center) return "EUROPE + ME";
   const [lon, lat] = center;
-  if (t.k > 15) return `${Math.abs(lat).toFixed(2)}°${lat>=0?"N":"S"} ${Math.abs(lon).toFixed(2)}°${lon>=0?"E":"W"}`;
-  if (t.k > 6)   return "DUBAI";
-  if (t.k > 1.6) return "GULF";
-  return "MIDDLE EAST";
+  // Above ~3× the zone label would lie (could be anywhere); show actual coords.
+  if (t.k > 3)   return `${Math.abs(lat).toFixed(2)}°${lat>=0?"N":"S"} ${Math.abs(lon).toFixed(2)}°${lon>=0?"E":"W"}`;
+  if (t.k > 1.2) return "MIDDLE EAST";
+  return "EUROPE + ME";
 }
 
 function wireZoomControls() {
